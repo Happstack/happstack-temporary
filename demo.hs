@@ -16,11 +16,6 @@ import Web.Routes.Happstack          (implSite_)
 import Web.Routes.TH
 import Web.Routes.MTL
 
-instance EmbedAsAttr (RouteT url (ServerPartT IO)) (Attr String url) where
-    asAttr (n := u) = 
-        do url <- showURL u
-           asAttr $ MkAttr (toName n, pAttrVal url)
-
 main :: IO ()
 main = simpleHTTP nullConf (impl "http://www.n-heptane.com:8000/")
 

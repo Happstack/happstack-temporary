@@ -20,12 +20,12 @@ module State.Auth
     , DeleteAuthToken(..)
     , AuthTokenAuthId(..)
     , GenAuthId(..)
-    , AddAuthIdentifier
-    , RemoveAuthIdentifier
-    , IdentifierAuthIds
-    , AddAuthUserPassId
-    , RemoveAuthUserPassId
-    , UserPassIdAuthIds
+    , AddAuthIdentifier(..)
+    , RemoveAuthIdentifier(..)
+    , IdentifierAuthIds(..)
+    , AddAuthUserPassId(..)
+    , RemoveAuthUserPassId(..)
+    , UserPassIdAuthIds(..)
     ) where
 
 import Control.Applicative ((<$>))
@@ -63,10 +63,9 @@ $(deriveNewData [''AuthId])
 succAuthId :: AuthId -> AuthId
 succAuthId (AuthId i) = AuthId (succ i)
 
-
 data AuthToken = AuthToken { tokenString  :: String
                            , tokenExpires :: UTCTime
-                           , tokenAuthId  :: AuthId
+                           , tokenAuthId  :: Set AuthId
                            }
       deriving (Eq, Ord, Data, Show, Typeable)
 $(deriveSerialize ''AuthToken)
@@ -112,18 +111,6 @@ $(inferIxSet "UserPasses" ''UserPass 'noCalcs [''UserName, ''HashedPass, ''AuthI
 instance Version Identifier
 $(deriveSerialize ''Identifier)
 $(deriveNewData [''Identifier])
-{-
-data AuthIdentifier
-    = AuthIdentifier { aiIdentifier :: Identifier
-                     , aiAuthId       :: AuthId
-                     }
-    deriving (Eq, Ord, Read, Show, Data, Typeable)
-
-instance Version AuthIdentifier
-$(deriveSerialize ''AuthIdentifier)
-
-$(inferIxSet "AuthsIdentifier" ''AuthIdentifier 'noCalcs [''Identifier, ''AuthId])
--}
 
 -- * AuthMap
 
@@ -311,19 +298,35 @@ deleteAuthToken authToken =
 authTokenAuthId :: String -> Query AuthState (Maybe AuthId)
 authTokenAuthId tokenString =
     do as@(AuthState{..}) <- ask
-       return $ (fmap tokenAuthId $ getOne $ authTokens @= tokenString)
+       case getOne $ authTokens @= tokenString of
+         Nothing -> return Nothing
+         (Just authToken) ->
+             case Set.size (tokenAuthId authToken) of
+               1 -> return (Just $ head $ Set.toList (tokenAuthId authToken))
+               _ -> return Nothing
+
+authTokenAuthIds :: String -> Query AuthState (Maybe (Set AuthId))
+authTokenAuthIds tokenString =
+    do as@(AuthState{..}) <- ask
+       case getOne $ authTokens @= tokenString of
+         Nothing -> return Nothing
+         (Just authToken) ->
+             return (Just $ tokenAuthId authToken)
 
 -- TODO: 
 --  - expireAuthTokens
 --  - tickleAuthToken  
 
 -- | generate an new authentication token
-genAuthToken :: (MonadIO m) => AuthId -> Int -> m AuthToken
+genAuthToken :: (MonadIO m) => Set AuthId -> Int -> m AuthToken
 genAuthToken aid lifetime =
     do random <- liftIO $ B.unpack <$> genSaltIO -- ^ the docs promise that the salt will be base64, so 'B.unpack' should be safe
        now <- liftIO $ getCurrentTime
        let expires = addUTCTime (fromIntegral lifetime) now
-       return $ AuthToken { tokenString  = (show unAuthId) ++  random
+           prefix = case Set.toList aid of
+                            [] -> show "0"
+                            (a:_) -> show (unAuthId a)
+       return $ AuthToken { tokenString  = prefix ++ random 
                           , tokenExpires = expires
                           , tokenAuthId  = aid
                           }
@@ -389,4 +392,16 @@ removeIdentifierToUserId :: Identifier -> UserId -> Update AuthState ()
 removeIdentifierToUserId identifier uid =
     do as@AuthState{..} <- get
        put $ as { authMaps = IxSet.insert (Identifier2UserId identifier uid) authMaps }
+-}
+{-
+data AuthIdentifier
+    = AuthIdentifier { aiIdentifier :: Identifier
+                     , aiAuthId       :: AuthId
+                     }
+    deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+instance Version AuthIdentifier
+$(deriveSerialize ''AuthIdentifier)
+
+$(inferIxSet "AuthsIdentifier" ''AuthIdentifier 'noCalcs [''Identifier, ''AuthId])
 -}

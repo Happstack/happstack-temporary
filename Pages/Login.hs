@@ -19,26 +19,22 @@ import Control.Applicative        ((<*>), (<$>), (<*))
 import Control.Monad              (replicateM)
 import Control.Monad.Trans        (MonadIO(liftIO))
 import Data.Maybe                 (mapMaybe)
+import           Data.Set         (Set)
 import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import Data.Time.Clock            (getCurrentTime)
-import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, addCookie, internalServerError, lookPairs, mkCookie, seeOther, toResponse)
+import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, ServerPartT, addCookie, internalServerError, lookPairs, mkCookie, seeOther, toResponse)
 import Happstack.State            (query, update)
 import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, genElement)
--- import Pages.AppTemplate          (appTemplate, appTemplate')
--- import Pages.InternalServerError  (internalServerErrorPage)
--- import State.Profile              (AddIdentifier(..), AskProfileByAuthId(..), AskProfileByIdentifier(..), CreateProfile(..), SetAuthToken(..))
--- import Pages.FormPart             (formPart, fieldset, ol, li)
-import State.Auth                 -- (AuthId(..), CheckAuth(..), GenUserId(..), genAuthToken)
--- import StoryPrompts               (StoryForm, StoryPrompts, seeOtherURL)
--- import StoryPromptsURL            (StoryPromptsURL(..), AuthURL(..), OpenIdProvider(..))
-import System.Random              (randomRIO)
+import State.Auth
+import Pages.AppTemplate
+import Profile
+import ProfileURL
 import Text.Digestive
 import Text.Digestive.HSP.Html4
--- import Types                      (AuthToken(..), Profile(userId))
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrlRealm)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
-import Web.Routes                 (ShowURL, showURL, URL)
+import Web.Routes                 (RouteT, ShowURL, showURL, URL)
 
 googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => Maybe String -> m Response
 googlePage realm =
@@ -52,16 +48,84 @@ openIdPage =
        let pairs = mapMaybe (\(k, ev) -> case ev of (Left _) -> Nothing ; (Right v) -> Just (k, v)) pairs'
        liftIO $ authenticate pairs
 
-identifierToAuthId :: Identifier -> m Response
+-- calling this will log you in as one or more AuthIds
+identifierToAuthId :: (Happstack m) => Identifier -> m (Set AuthId)
 identifierToAuthId identifier =
-    do authIds <- query (IdentifierAuthId identifier)
-       case Set.size userIds of
-         0 -> do uid <- createNewProfile authId
-                 addAuthCookie uid
-                 return $ toResponse $ "logged in as " ++ show uid
+    do authIds <- query (IdentifierAuthIds identifier)
+       addAuthCookie authIds
+       return authIds
+{-
+data R =
+       NowUser UserId
+       | PickAuth (Set AuthIds)
+-}
 
+{-
+data PickUser 
+    = Picked UserId
+    | NeedsPickin (Set UserId)
+  -}            
+
+pickUserId :: AuthId -> RouteT ProfileURL (ServerPartT IO) Response
+pickUserId aid =
+    do mUid <- query (AuthIdUserId aid)
+       case mUid of
+         Nothing ->
+             do profiles <- query (AuthIdProfiles aid)
+                case Set.size profiles of
+                  -- this probably should not happen ?
+                  0 -> do uid <- update (CreateNewProfile (Set.singleton aid))
+                          update (SetAuthIdUserId aid uid)
+                          return $ toResponse $ "logged in as " ++ show uid
+                  1 -> do let profile = head $ Set.toList profiles
+                          update (SetAuthIdUserId aid (userId profile))
+                          return $ toResponse $ "logged in as " ++ show (userId profile)
+--                  n -> do 
+
+personalityPicker :: Set Profile -> RouteT ProfileURL (ServerPartT IO) Response
+personalityPicker profiles =
+    appTemplate "Pick A Personality" ()
+                <div>
+                 <ul><% mapM personality (Set.toList profiles) %></ul>
+                </div>
+    where
+      personality profile =
+          <li><a href=(P_SetPersonality (userId profile))><% nickName profile %></a></li>
+                
+{-
+                   Nothing -> 
+                       do uid <- update (CreateNewProfile (Set.singleton aid))
+                          update (SetAuthIdUserId aid uid)
+                          return $ toResponse $ "logged in as " ++ show uid
+                   (Just uid) ->
+                       do 
+-}
+
+{-
+authIdsToUserId :: (Happstack m) => Set AuthIds -> m Response
+authIdsToUserId authIds =
+       case Set.size authIds of
+         0 -> do aid <- update GenAuthId
+                 uid <- update (CreateNewProfile (Set.singleton aid))
+                 update (SetAuthIdUserId aid uid)
+                 return $ toResponse $ "logged in as " ++ show uid
+         1 -> do let aid = (head $ Set.toList authIds)
+                 mUid <- query (AuthIdUserId aid)
+                 case mUid of
+                   Nothing ->  -- this probably should not happen ?
+                       do uid <- update (CreateNewProfile (Set.singleton aid))
+                          update (SetAuthIdUserId aid uid)
+                          return $ toResponse $ "logged in as " ++ show uid
+                   (Just uid) ->
+                       do 
+-}
+--         n -> do 
+
+
+ -- here we have multiple auth ids to pick from. We need to show the user something. But that means stopping and generating a new page. but we will lose the Identifier then.
          
-       
+
+
 
 {-
 foo :: (Happstack m) => Identifier -> m Response

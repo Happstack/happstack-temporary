@@ -19,18 +19,11 @@ import State.Auth
 import Happstack.Data
 import Happstack.State
 import Happstack.Server
-import           Happstack.Data.IxSet (IxSet, inferIxSet, noCalcs)
+import           Happstack.Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
 import qualified Happstack.Data.IxSet as IxSet
+import Types
 
 
-newtype UserId = UserId { unUserId :: Integer }
-      deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version UserId
-$(deriveSerialize ''UserId)
-$(deriveNewData [''UserId])
-
-succUserId :: UserId -> UserId
-succUserId (UserId i) = UserId (succ i)
 
 data Profile 
     = Profile
@@ -69,10 +62,19 @@ genUserId =
        put (as { nextUserId = succUserId nextUserId })
        return nextUserId
 
+-- return the UserId currently prefered by this AuthId
+--
+-- can be Nothing if no preference is set, even if there are possible UserIds
 authIdUserId :: AuthId -> Query ProfileState (Maybe UserId)
 authIdUserId aid =
     do ps@(ProfileState {..}) <- ask
        return $ Map.lookup aid authUserMap 
+
+-- return all the Profiles associated with this AuthId
+authIdProfiles :: AuthId -> Query ProfileState (Set Profile)
+authIdProfiles aid =
+    do ps@(ProfileState {..}) <- ask
+       return $ IxSet.toSet (profiles @= aid)
 
 setAuthIdUserId :: AuthId -> UserId -> Update ProfileState ()
 setAuthIdUserId authId userId =
@@ -93,13 +95,14 @@ createNewProfile authIds =
 
 $(mkMethods ''ProfileState 
                 [ 'authIdUserId
+                , 'authIdProfiles
                 , 'setAuthIdUserId
                 , 'createNewProfile
                 , 'genUserId
                 ])
        
 
-addAuthCookie :: (Happstack m) => AuthId -> m ()
+addAuthCookie :: (Happstack m) => (Set AuthId) -> m ()
 addAuthCookie aid =
     do authToken <- genAuthToken aid (60*60) 
        update (SetAuthToken authToken)
