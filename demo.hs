@@ -11,6 +11,7 @@ import Pages.AppTemplate
 import Pages.Login
 import State.Auth
 import SiteURL
+import ProfileURL
 import Web.Routes
 import Web.Routes.Happstack          (implSite_)
 import Web.Routes.TH
@@ -39,10 +40,14 @@ spec =
 handle :: SiteURL -> RouteT SiteURL (ServerPartT IO) Response
 handle U_HomePage    = homePage
 handle (U_Auth auth) = nestURL U_Auth $ handleAuth auth
+handle (U_Profile profile) = nestURL U_Profile $ handleProfile profile
 
 handleAuth :: AuthURL -> RouteT AuthURL (ServerPartT IO) Response
 handleAuth A_Login = loginPage
 handleAuth (A_OpenIdProvider Google) = googlePage (Just "http://*.n-heptane.com/")
+
+handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
+handleProfile P_PickProfile = pickProfile
 
 homePage :: RouteT SiteURL (ServerPartT IO) Response
 homePage = 

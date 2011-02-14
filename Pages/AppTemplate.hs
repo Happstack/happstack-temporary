@@ -19,6 +19,7 @@ import Web.Routes.Happstack
 appTemplate' :: 
     ( EmbedAsChild (RouteT url (ServerPartT IO)) headers 
     , EmbedAsChild (RouteT url (ServerPartT IO)) body
+    , EmbedAsAttr  (RouteT url (ServerPartT IO)) (Attr String String)
     )
     => String -- ^ title 
     -> headers  -- ^ extra tags to include in \<head\>
@@ -39,6 +40,7 @@ appTemplate' title headers body = do
 appTemplate :: 
     ( EmbedAsChild (RouteT url (ServerPartT IO)) headers 
     , EmbedAsChild (RouteT url (ServerPartT IO)) body
+    , EmbedAsAttr  (RouteT url (ServerPartT IO)) (Attr String String)
     )
     => String -- ^ title 
     -> headers  -- ^ extra tags to include in \<head\>

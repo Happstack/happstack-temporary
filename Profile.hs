@@ -23,8 +23,6 @@ import           Happstack.Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
 import qualified Happstack.Data.IxSet as IxSet
 import Types
 
-
-
 data Profile 
     = Profile
     { userId :: UserId
@@ -100,15 +98,6 @@ $(mkMethods ''ProfileState
                 , 'createNewProfile
                 , 'genUserId
                 ])
-       
-
-addAuthCookie :: (Happstack m) => (Set AuthId) -> m ()
-addAuthCookie aid =
-    do authToken <- genAuthToken aid (60*60) 
-       update (SetAuthToken authToken)
-       addCookie Session (mkCookie "authToken" (tokenString authToken))
-       return ()
-
 
 getUserId :: (Alternative m, Happstack m) => m (Maybe UserId)
 getUserId =
@@ -121,4 +110,6 @@ getUserId =
                   Nothing -> return Nothing
                   (Just authId) ->
                       query (AuthIdUserId authId)
+
+
 

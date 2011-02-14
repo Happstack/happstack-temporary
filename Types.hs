@@ -10,6 +10,7 @@ import Happstack.Data
 import Happstack.Server
 import HSP
 import Web.Routes
+import Web.Routes.XMLGenT
 
 newtype UserId = UserId { unUserId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)

@@ -10,12 +10,14 @@ import Web.Routes
 import Happstack.Server
 import Web.Routes.Happstack
 import Web.Routes.MTL
+import Web.Routes.XMLGenT
 import Types
 
 instance Happstack (RouteT ProfileURL (ServerPartT IO))
 
 data ProfileURL
     = P_SetPersonality UserId
+    | P_PickProfile
       deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 instance Arbitrary ProfileURL where
@@ -35,3 +37,10 @@ instance PathInfo ProfileURL where
 authUrlInverse :: Property
 authUrlInverse =
     property (pathInfoInverse_prop :: ProfileURL -> Bool)
+
+{-
+instance EmbedAsAttr (RouteT ProfileURL (ServerPartT IO)) (Attr String ProfileURL) where
+    asAttr (n := u) = 
+        do url <- showURL u
+           asAttr $ MkAttr (toName n, pAttrVal url)
+-}
