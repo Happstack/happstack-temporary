@@ -18,20 +18,25 @@ module State.Auth
     , CreateUserPass(..)
     , SetPassword(..)
     , AddAuthToken(..)
+    , AskAuthToken(..)
+    , UpdateAuthToken(..)
     , DeleteAuthToken(..)
     , AuthTokenAuthId(..)
     , GenAuthId(..)
     , AddAuthIdentifier(..)
-    , NewAuthIdentifier(..)
+    , NewAuthMethod(..)
     , RemoveAuthIdentifier(..)
     , IdentifierAuthIds(..)
     , AddAuthUserPassId(..)
     , RemoveAuthUserPassId(..)
     , UserPassIdAuthIds(..)
+    , AskAuthState(..)
     , addAuthCookie
+    , getAuthId
+    , getAuthToken
     ) where
 
-import Control.Applicative ((<$>))
+import Control.Applicative  (Alternative, (<$>), optional)
 import Control.Monad        (replicateM)
 import Control.Monad.Reader (ask)
 import Control.Monad.State  (get, put)
@@ -128,20 +133,20 @@ data AuthMap
 instance Version AuthMap
 $(deriveSerialize ''AuthMap)
 
-$(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''Identifier, ''UserPassId])
+$(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''AuthMethod, ''Identifier, ''UserPassId])
 
 -- * AuthToken
 
 data AuthToken = AuthToken { tokenString  :: String
                            , tokenExpires :: UTCTime
-                           , tokenAuthId  :: Set AuthId
+                           , tokenAuthId  :: Maybe AuthId
                            , tokenAuthMethod :: AuthMethod
                            }
       deriving (Eq, Ord, Data, Show, Typeable)
 $(deriveSerialize ''AuthToken)
 instance Version AuthToken
 
-$(inferIxSet "AuthTokens" ''AuthToken 'noCalcs [''AuthId, ''String])
+$(inferIxSet "AuthTokens" ''AuthToken 'noCalcs [''String, ''AuthId])
 
 
 -- * AuthState
@@ -275,10 +280,10 @@ addAuthIdentifier identifier authid =
     do as@(AuthState{..}) <- ask
        put $ as { authMaps = IxSet.insert (AuthMap (AuthIdentifier identifier) authid) authMaps }
 
-newAuthIdentifier :: Identifier -> Update AuthState AuthId
-newAuthIdentifier identifier =
+newAuthMethod :: AuthMethod -> Update AuthState AuthId
+newAuthMethod authMethod =
     do as@(AuthState{..}) <- ask
-       put $ as { authMaps = IxSet.insert (AuthMap (AuthIdentifier identifier) nextAuthId) authMaps 
+       put $ as { authMaps = IxSet.insert (AuthMap authMethod nextAuthId) authMaps 
                 , nextAuthId = succAuthId nextAuthId
                 }
        return nextAuthId
@@ -316,26 +321,30 @@ addAuthToken authToken =
     do as@AuthState{..} <- get
        put (as { authTokens = IxSet.insert authToken authTokens })
 
+-- | look up the 'AuthToken' associated with the 'String'
+askAuthToken :: String  -- ^ token string (used in the cookie)
+             -> Query AuthState (Maybe AuthToken)
+askAuthToken tokenStr =
+    do as@AuthState{..} <- ask
+       return $ getOne $ authTokens @= tokenStr
+
 updateAuthToken :: AuthToken -> Update AuthState ()
 updateAuthToken authToken =
     do as@AuthState{..} <- get
-       put (as { authTokens = IxSet.insert authToken authTokens })
+       put (as { authTokens = IxSet.updateIx (tokenString authToken) authToken authTokens })
 
 deleteAuthToken :: String -> Update AuthState ()
-deleteAuthToken authToken =
+deleteAuthToken tokenStr =
     do as@AuthState{..} <- get
-       put (as { authTokens = IxSet.deleteIx authToken authTokens })
+       put (as { authTokens = IxSet.deleteIx tokenStr authTokens })
 
 authTokenAuthId :: String -> Query AuthState (Maybe AuthId)
 authTokenAuthId tokenString =
     do as@(AuthState{..}) <- ask
        case getOne $ authTokens @= tokenString of
-         Nothing -> return Nothing
-         (Just authToken) ->
-             case Set.size (tokenAuthId authToken) of
-               1 -> return (Just $ head $ Set.toList (tokenAuthId authToken))
-               _ -> return Nothing
-
+         Nothing          -> return Nothing
+         (Just authToken) -> return $ (tokenAuthId authToken)
+{-
 authTokenAuthIds :: String -> Query AuthState (Maybe (Set AuthId))
 authTokenAuthIds tokenString =
     do as@(AuthState{..}) <- ask
@@ -343,23 +352,24 @@ authTokenAuthIds tokenString =
          Nothing -> return Nothing
          (Just authToken) ->
              return (Just $ tokenAuthId authToken)
+-}
 
 -- TODO: 
 --  - expireAuthTokens
 --  - tickleAuthToken  
 
 -- | generate an new authentication token
-genAuthToken :: (MonadIO m) => Set AuthId -> AuthMethod -> Int -> m AuthToken
+genAuthToken :: (MonadIO m) => Maybe AuthId -> AuthMethod -> Int -> m AuthToken
 genAuthToken aid authMethod lifetime =
     do random <- liftIO $ B.unpack <$> genSaltIO -- ^ the docs promise that the salt will be base64, so 'B.unpack' should be safe
        now <- liftIO $ getCurrentTime
        let expires = addUTCTime (fromIntegral lifetime) now
-           prefix = case Set.toList aid of
-                            [] -> show "0"
-                            (a:_) -> show (unAuthId a)
-       return $ AuthToken { tokenString  = prefix ++ random 
-                          , tokenExpires = expires
-                          , tokenAuthId  = aid
+           prefix = case aid of
+                      Nothing  -> "0"
+                      (Just a) -> show (unAuthId a)
+       return $ AuthToken { tokenString     = prefix ++ random 
+                          , tokenExpires    = expires
+                          , tokenAuthId     = aid
                           , tokenAuthMethod = authMethod
                           }
 
@@ -370,30 +380,54 @@ genAuthId =
        put (as { nextAuthId = succAuthId nextAuthId })
        return nextAuthId
 
+askAuthState :: Query AuthState AuthState
+askAuthState = ask
+
 $(mkMethods ''AuthState [ 'checkUserPass
                         , 'createUserPass
                         , 'setUserName
                         , 'setPassword
                         , 'addAuthToken
+                        , 'askAuthToken
+                        , 'updateAuthToken
                         , 'deleteAuthToken
                         , 'authTokenAuthId
                         , 'genAuthId
-
                         , 'addAuthIdentifier
-                        , 'newAuthIdentifier
+                        , 'newAuthMethod
                         , 'removeAuthIdentifier
                         , 'identifierAuthIds
                         , 'addAuthUserPassId
                         , 'removeAuthUserPassId
                         , 'userPassIdAuthIds
+                        , 'askAuthState
                         ])
 
-addAuthCookie :: (Happstack m) => (Set AuthId) -> AuthMethod -> m ()
+-- * happstack-server level stuff
+
+addAuthCookie :: (Happstack m) => Maybe AuthId -> AuthMethod -> m ()
 addAuthCookie aid authMethod =
     do authToken <- genAuthToken aid authMethod (60*60) 
        update (AddAuthToken authToken)
        addCookie Session (mkCookie "authToken" (tokenString authToken))
        return ()
+
+getAuthToken :: (Alternative m, Happstack m) => m (Maybe AuthToken)
+getAuthToken =
+    do mTokenStr <- optional $ lookCookieValue "authToken"
+       liftIO $ putStrLn $ "authToken cookie value = " ++ show mTokenStr
+       case mTokenStr of
+         Nothing -> return Nothing
+         (Just tokenStr) ->
+             query (AskAuthToken tokenStr)
+             
+getAuthId :: (Alternative m, Happstack m) => m (Maybe AuthId)
+getAuthId =
+    do mTokenStr <- optional $ lookCookieValue "authToken"
+       case mTokenStr of
+         Nothing         -> return Nothing
+         (Just tokenStr) -> query (AuthTokenAuthId tokenStr)
+
 
 
 

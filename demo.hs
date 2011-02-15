@@ -1,14 +1,18 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, TypeFamilies, TypeOperators #-}
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Main where
 
 import AuthURL
+import Control.Concurrent (forkIO, killThread)
 import Control.Monad (msum, mzero)
 import Control.Monad.Trans (liftIO)
+import Data.Data
+import Happstack.State
 import Happstack.Server
 import HSP
 import Pages.AppTemplate
 import Pages.Login
+import Profile
 import State.Auth
 import SiteURL
 import ProfileURL
@@ -17,15 +21,58 @@ import Web.Routes.Happstack          (implSite_)
 import Web.Routes.TH
 import Web.Routes.MTL
 
+data DemoState = DemoState
+      deriving (Eq, Read, Show, Data, Typeable)
+$(deriveSerialize ''DemoState)
+instance Version DemoState
+
+instance Component DemoState where
+    type Dependencies DemoState = AuthState :+: ProfileState :+: End
+    initialValue = DemoState
+
+$(mkMethods ''DemoState [])
+
 main :: IO ()
-main = simpleHTTP nullConf (impl "http://www.n-heptane.com:8000/")
+main = 
+    do state <- startSystemState (Proxy :: Proxy DemoState)
+       tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl "http://www.n-heptane.com:8000/")
+       putStrLn "started."
+       waitForTermination
+       killThread tid
+       shutdownSystem state
+
+printResponse :: Response -> IO Response
+printResponse res =
+    do putStrLn $ showResponse res ""
+       return res
+    where
+      showResponse res@Response{}  =
+          showString   "================== Response ================" .
+          showString "\nrsCode      = " . shows      (rsCode res)     .
+          showString "\nrsHeaders   = " . shows      (rsHeaders res)  .
+          showString "\nrsFlags     = " . shows      (rsFlags res)    .
+          showString "\nrsBody      = " . shows      (rsBody res)     .
+          showString "\nrsValidator = " . shows      (rsValidator res)
+      showResponse res@SendFile{}  =
+          showString   "================== Response ================" .
+          showString "\nrsCode      = " . shows      (rsCode res)     .
+          showString "\nrsHeaders   = " . shows      (rsHeaders res)  .
+          showString "\nrsFlags     = " . shows      (rsFlags res)    .
+          showString "\nrsValidator = " . shows      (rsValidator res).
+          showString "\nsfFilePath  = " . shows      (sfFilePath res) .
+          showString "\nsfOffset    = " . shows      (sfOffset res)   .
+          showString "\nsfCount     = " . shows      (sfCount res)
 
 impl :: String -> ServerPartT IO Response
-impl baseURI = 
+impl baseURI = do
+    rq <- askRq
+    liftIO $ print rq
     msum [ do r <- implSite_ baseURI "web/" spec
               case r of
                 (Left e) -> liftIO (print e) >> mzero
                 (Right r) -> return r
+         , dir "dump_auth" $ do authState <- query AskAuthState 
+                                ok $ toResponse (show authState)
          , nullDir >> seeOther "/web/" (toResponse "")
          ]
 
@@ -38,16 +85,22 @@ spec =
            }
 
 handle :: SiteURL -> RouteT SiteURL (ServerPartT IO) Response
-handle U_HomePage    = homePage
-handle (U_Auth auth) = nestURL U_Auth $ handleAuth auth
+handle U_HomePage          = homePage
+handle (U_Auth auth)       = do onAuthURL <- showURL (U_Profile P_PickProfile)
+                                nestURL U_Auth $ handleAuth onAuthURL auth
 handle (U_Profile profile) = nestURL U_Profile $ handleProfile profile
 
-handleAuth :: AuthURL -> RouteT AuthURL (ServerPartT IO) Response
-handleAuth A_Login = loginPage
-handleAuth (A_OpenIdProvider Google) = googlePage (Just "http://*.n-heptane.com/")
+handleAuth :: String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
+handleAuth onAuthURL url =
+    case url of
+      A_Login                   -> loginPage
+      (A_OpenIdProvider Google) -> googlePage (Just "http://*.n-heptane.com:8000/")
+      A_OpenId                  -> openIdPage onAuthURL
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
-handleProfile P_PickProfile = pickProfile
+handleProfile url =
+    case url of
+      P_PickProfile -> pickProfile
 
 homePage :: RouteT SiteURL (ServerPartT IO) Response
 homePage = 

@@ -16,7 +16,7 @@ module Pages.Login where
     ) 
 -}
 import AuthURL
-import Control.Applicative        ((<*>), (<$>), (<*))
+import Control.Applicative        (Alternative, (<*>), (<$>), (<*), optional)
 import Control.Monad              (replicateM)
 import Control.Monad.Trans        (MonadIO(liftIO))
 import Data.Maybe                 (mapMaybe)
@@ -24,7 +24,7 @@ import           Data.Set         (Set)
 import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import Data.Time.Clock            (getCurrentTime)
-import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, ServerPartT, addCookie, internalServerError, lookPairs, mkCookie, seeOther, toResponse)
+import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, ServerPartT, addCookie, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse)
 import Happstack.State            (query, update)
 import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, genElement)
 import State.Auth
@@ -49,11 +49,11 @@ googlePage realm =
 -- this verifies the identifier
 -- and sets authToken cookie
 -- if the identifier was not associated with an AuthId, then a new AuthId will be created and associated with it.
-openIdPage :: RouteT AuthURL (ServerPartT IO) (Set AuthId)
-openIdPage = 
+openIdPage :: String -> RouteT AuthURL (ServerPartT IO) Response -- (Maybe AuthId)
+openIdPage onAuthURL = 
     do identifier <- getIdentifier
        addAuthIdsCookie identifier
---       pickAuthId authIds
+       seeOther onAuthURL (toResponse ())
 
 -- this get's the identifier the openid provider provides. It is our only chance to capture the Identifier. So, before we send a Response we need to have some sort of cookie set that identifies the user. We can not just put the identifier in the cookie because we don't want some one to fake it.
 getIdentifier :: (Happstack m) => m Identifier
@@ -68,39 +68,45 @@ getIdentifier =
 -- so, if there are no AuthIds associated with the identifier, we create one.
 --
 -- we have another problem though.. we want to allow a user to specify a prefered AuthId. But that preference needs to be linked to a specific Identifier ?
-addAuthIdsCookie :: (Happstack m) => Identifier -> m (Set AuthId)
+addAuthIdsCookie :: (Happstack m) => Identifier -> m (Maybe AuthId)
 addAuthIdsCookie identifier =
-    do authIds <- 
+    do authId <- 
            do authIds <- query (IdentifierAuthIds identifier)
               case Set.size authIds of
-                 0 -> do authId <- update (NewAuthIdentifier identifier)
-                         return $ Set.singleton authId
-                 n -> return authIds
-       addAuthCookie authIds (AuthIdentifier identifier)
-       return authIds      
-
+                 1 -> return $ (Just $ head $ Set.toList $ authIds)
+                 n -> return $ Nothing
+       addAuthCookie authId (AuthIdentifier identifier)
+       return authId
 
 -- * ProfileURL stuff
 
 -- can we pick an AuthId with only the information in the Auth stuff? Or should that be a profile action ?
-{-
+
 pickAuthId :: RouteT ProfileURL (ServerPartT IO) AuthId
 pickAuthId =
-    do authToken <- look "authToken"
-       
-    case Set.size authIds of
-      1 -> return (head $ Set.toList authIds)
--}
+    do (Just authToken) <- getAuthToken -- FIXME
+       case tokenAuthId authToken of
+         (Just authId) -> return authId
+         Nothing ->
+             do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME
+                case Set.size authIds of
+                  0 -> do authId <- update (NewAuthMethod (tokenAuthMethod authToken))
+                          update (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
+                          return authId
+                  1 -> do let aid = head $ Set.toList authIds
+                          update (UpdateAuthToken (authToken { tokenAuthId = Just aid }))
+                          return aid
+                  n -> undefined -- FIXME
+
 -- now that we have things narrowed down to a single 'AuthId', pick which personality we want to be
 pickProfile :: RouteT ProfileURL (ServerPartT IO) Response
 pickProfile =
-    do let aid = undefined
+    do aid <- pickAuthId
        mUid <- query (AuthIdUserId aid)
        case mUid of
          Nothing ->
              do profiles <- query (AuthIdProfiles aid)
                 case Set.size profiles of
-                  -- this probably should not happen ?
                   0 -> do uid <- update (CreateNewProfile (Set.singleton aid))
                           update (SetAuthIdUserId aid uid)
                           return $ toResponse $ "logged in as " ++ show uid
@@ -108,6 +114,8 @@ pickProfile =
                           update (SetAuthIdUserId aid (userId profile))
                           return $ toResponse $ "logged in as " ++ show (userId profile)
                   n -> do personalityPicker profiles
+         (Just uid) ->
+             return $ toResponse $ "logged in as " ++ show uid
 
 personalityPicker :: Set Profile -> RouteT ProfileURL (ServerPartT IO) Response
 personalityPicker profiles =

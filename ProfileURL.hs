@@ -22,16 +22,20 @@ data ProfileURL
 
 instance Arbitrary ProfileURL where
     arbitrary = oneof $ [ P_SetPersonality . UserId <$> arbitrary
+                        , return P_PickProfile
                         ]
 
 
 instance PathInfo ProfileURL where
     toPathSegments (P_SetPersonality userId) = "set_personality" : toPathSegments userId
+    toPathSegments P_PickProfile             = ["pick_profile"]
 
     fromPathSegments =
         msum [ do segment "set_personality"
                   userId <- fromPathSegments
                   return (P_SetPersonality userId)
+             , do segment "pick_profile"
+                  return P_PickProfile
              ]
 
 authUrlInverse :: Property
