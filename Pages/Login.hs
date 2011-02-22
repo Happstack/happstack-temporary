@@ -99,8 +99,8 @@ pickAuthId =
                   n -> undefined -- FIXME
 
 -- now that we have things narrowed down to a single 'AuthId', pick which personality we want to be
-pickProfile :: RouteT ProfileURL (ServerPartT IO) Response
-pickProfile =
+pickProfile :: String -> RouteT ProfileURL (ServerPartT IO) Response
+pickProfile onLoginURL =
     do aid <- pickAuthId
        mUid <- query (AuthIdUserId aid)
        case mUid of
@@ -109,13 +109,13 @@ pickProfile =
                 case Set.size profiles of
                   0 -> do uid <- update (CreateNewProfile (Set.singleton aid))
                           update (SetAuthIdUserId aid uid)
-                          return $ toResponse $ "logged in as " ++ show uid
+                          seeOther onLoginURL (toResponse onLoginURL)
                   1 -> do let profile = head $ Set.toList profiles
                           update (SetAuthIdUserId aid (userId profile))
-                          return $ toResponse $ "logged in as " ++ show (userId profile)
+                          seeOther onLoginURL (toResponse onLoginURL)
                   n -> do personalityPicker profiles
          (Just uid) ->
-             return $ toResponse $ "logged in as " ++ show uid
+             seeOther onLoginURL (toResponse onLoginURL)
 
 personalityPicker :: Set Profile -> RouteT ProfileURL (ServerPartT IO) Response
 personalityPicker profiles =

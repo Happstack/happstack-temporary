@@ -11,8 +11,6 @@ import Happstack.Server
 import Web.Routes.Happstack
 import Web.Routes.MTL
 
-instance Happstack (RouteT AuthURL (ServerPartT IO))
-
 -- | move to Web.Routes.Happstack
 seeOtherURL :: (ShowURL m, FilterMonad Response m) => URL m -> m Response
 seeOtherURL url = 

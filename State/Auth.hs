@@ -32,6 +32,7 @@ module State.Auth
     , UserPassIdAuthIds(..)
     , AskAuthState(..)
     , addAuthCookie
+    , deleteAuthCookie
     , getAuthId
     , getAuthToken
     ) where
@@ -412,10 +413,18 @@ addAuthCookie aid authMethod =
        addCookie Session (mkCookie "authToken" (tokenString authToken))
        return ()
 
+deleteAuthCookie :: (Happstack m, Alternative m) => m ()
+deleteAuthCookie =
+    do mTokenStr <- optional $ lookCookieValue "authToken"
+       case mTokenStr of
+         Nothing         -> return ()
+         (Just tokenStr) -> 
+             do expireCookie "authToken"
+                update (DeleteAuthToken tokenStr)
+
 getAuthToken :: (Alternative m, Happstack m) => m (Maybe AuthToken)
 getAuthToken =
     do mTokenStr <- optional $ lookCookieValue "authToken"
-       liftIO $ putStrLn $ "authToken cookie value = " ++ show mTokenStr
        case mTokenStr of
          Nothing -> return Nothing
          (Just tokenStr) ->
@@ -427,9 +436,6 @@ getAuthId =
        case mTokenStr of
          Nothing         -> return Nothing
          (Just tokenStr) -> query (AuthTokenAuthId tokenStr)
-
-
-
 
 {-
 -- | hash a password

@@ -11,6 +11,8 @@ import Happstack.Server
 import HSP
 import Web.Routes
 import Web.Routes.XMLGenT
+import Web.Routes.Happstack
+import Web.Routes.MTL
 
 newtype UserId = UserId { unUserId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
@@ -29,3 +31,5 @@ instance EmbedAsAttr (RouteT url (ServerPartT IO)) (Attr String url) where
     asAttr (n := u) = 
         do url <- showURL u
            asAttr $ MkAttr (toName n, pAttrVal url)
+
+instance (Happstack m) => Happstack (RouteT url m)

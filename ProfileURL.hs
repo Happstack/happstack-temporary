@@ -13,8 +13,6 @@ import Web.Routes.MTL
 import Web.Routes.XMLGenT
 import Types
 
-instance Happstack (RouteT ProfileURL (ServerPartT IO))
-
 data ProfileURL
     = P_SetPersonality UserId
     | P_PickProfile

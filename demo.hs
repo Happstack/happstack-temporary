@@ -11,7 +11,9 @@ import Happstack.State
 import Happstack.Server
 import HSP
 import Pages.AppTemplate
+import Pages.Home
 import Pages.Login
+import Pages.Logout
 import Profile
 import State.Auth
 import SiteURL
@@ -85,29 +87,25 @@ spec =
            }
 
 handle :: SiteURL -> RouteT SiteURL (ServerPartT IO) Response
-handle U_HomePage          = homePage
-handle (U_Auth auth)       = do onAuthURL <- showURL (U_Profile P_PickProfile)
+handle url =
+    case url of
+      U_HomePage          -> homePage
+      (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
                                 nestURL U_Auth $ handleAuth onAuthURL auth
-handle (U_Profile profile) = nestURL U_Profile $ handleProfile profile
+      (U_Profile profile) -> nestURL U_Profile $ handleProfile profile
 
 handleAuth :: String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
 handleAuth onAuthURL url =
     case url of
       A_Login                   -> loginPage
+      A_Logout                  -> logoutPage
       (A_OpenIdProvider Google) -> googlePage (Just "http://*.n-heptane.com:8000/")
       A_OpenId                  -> openIdPage onAuthURL
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
 handleProfile url =
     case url of
-      P_PickProfile -> pickProfile
-
-homePage :: RouteT SiteURL (ServerPartT IO) Response
-homePage = 
-    appTemplate "this page rocks." ()
-      <div>
-       <p>You can login <a href=(U_Auth A_Login)>here</a>.</p>
-      </div>
+      P_PickProfile -> pickProfile "/"
 
 loginPage :: RouteT AuthURL (ServerPartT IO) Response
 loginPage =
