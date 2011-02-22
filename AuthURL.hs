@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances #-}
 module AuthURL where
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad
 import Data.Data
 import Data.Typeable
@@ -25,29 +25,68 @@ data OpenIdProvider
     | Generic
       deriving (Eq, Ord, Read, Show, Data, Typeable, Enum, Bounded)
 
+instance PathInfo OpenIdProvider where
+    toPathSegments Google      = ["google"]
+    toPathSegments Yahoo       = ["yahoo"]
+    toPathSegments Myspace     = ["myspace"]
+    toPathSegments LiveJournal = ["livejournal"]
+    toPathSegments Generic     = ["generic"]
+    fromPathSegments =
+        msum [ do segment "google"
+                  return Google
+             , do segment "yahoo"
+                  return Yahoo
+             , do segment "myspace"
+                  return Myspace
+             , do segment "livejournal"
+                  return LiveJournal
+             , do segment "generic"
+                  return Generic
+             ]
+
 instance Arbitrary OpenIdProvider where
     arbitrary = oneof $ map return [ minBound .. maxBound ]
 
+data AuthMode 
+    = LoginMode
+    | AddIdentifierMode
+      deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+instance PathInfo AuthMode where
+    toPathSegments LoginMode         = ["login"]
+    toPathSegments AddIdentifierMode = ["add_identifier"]
+    fromPathSegments =
+        msum [ do segment "login"
+                  return LoginMode
+             , do segment "add_identifier"
+                  return AddIdentifierMode
+             ]
+    
+      
+instance Arbitrary AuthMode where
+    arbitrary = oneof [ return LoginMode
+                      , return AddIdentifierMode
+                      ]
 
 data AuthURL 
     = A_Login
     | A_Logout
     | A_Local
-    | A_OpenId
-    | A_OpenIdProvider OpenIdProvider
+    | A_OpenId AuthMode
+    | A_OpenIdProvider AuthMode OpenIdProvider
     | A_CreateAccount
     | A_ChangePassword
       deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 instance Arbitrary AuthURL where
-    arbitrary = oneof $ [ return A_Login
-                        , return A_Logout
-                        , return A_Local
-                        , return A_OpenId
-                        , A_OpenIdProvider <$> arbitrary
-                        , return A_CreateAccount
-                        , return A_ChangePassword
-                        ]
+    arbitrary = oneof [ return A_Login
+                      , return A_Logout
+                      , return A_Local
+                      , A_OpenId <$> arbitrary
+                      , A_OpenIdProvider <$> arbitrary <*> arbitrary
+                      , return A_CreateAccount
+                      , return A_ChangePassword
+                      ]
 
 
 -- $(derivePathInfo ''AuthURL)
@@ -56,12 +95,9 @@ instance PathInfo AuthURL where
     toPathSegments A_Login                        = ["login"]
     toPathSegments A_Logout                       = ["logout"]
     toPathSegments A_Local                        = ["local"]
-    toPathSegments A_OpenId                       = ["openid_return"]
-    toPathSegments (A_OpenIdProvider Google)      = ["openid", "google"]
-    toPathSegments (A_OpenIdProvider Yahoo)       = ["openid", "yahoo"]
-    toPathSegments (A_OpenIdProvider Myspace)     = ["openid", "myspace"]
-    toPathSegments (A_OpenIdProvider LiveJournal) = ["openid", "livejournal"]
-    toPathSegments (A_OpenIdProvider Generic)     = ["openid", "generic"]
+    toPathSegments (A_OpenId authMode)            = "openid_return" : toPathSegments authMode
+    toPathSegments (A_OpenIdProvider authMode provider) 
+                                                  = "openid" : toPathSegments authMode ++ toPathSegments provider
     toPathSegments A_CreateAccount                = ["create"]
     toPathSegments A_ChangePassword               = ["change_password"]
 
@@ -73,19 +109,12 @@ instance PathInfo AuthURL where
              , do segment "local"
                   return A_Local
              , do segment "openid_return"
-                  return A_OpenId
+                  mode <- fromPathSegments
+                  return (A_OpenId mode)
              , do segment "openid"
-                  msum [ do segment "google"
-                            return (A_OpenIdProvider Google)
-                       , do segment "yahoo"
-                            return (A_OpenIdProvider Yahoo)
-                       , do segment "myspace"
-                            return (A_OpenIdProvider Myspace)
-                       , do segment "livejournal"
-                            return (A_OpenIdProvider LiveJournal)
-                       , do segment "generic"
-                            return (A_OpenIdProvider Generic)
-                       ]
+                  authMode <- fromPathSegments
+                  provider <- fromPathSegments
+                  return (A_OpenIdProvider authMode provider)
              , do segment "create"
                   return A_CreateAccount
              , do segment "change_password"

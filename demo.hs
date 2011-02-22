@@ -99,8 +99,8 @@ handleAuth onAuthURL url =
     case url of
       A_Login                   -> loginPage
       A_Logout                  -> logoutPage
-      (A_OpenIdProvider Google) -> googlePage (Just "http://*.n-heptane.com:8000/")
-      A_OpenId                  -> openIdPage onAuthURL
+      (A_OpenIdProvider authMode Google) -> googlePage authMode (Just "http://*.n-heptane.com:8000/") 
+      (A_OpenId authMode)           -> openIdPage authMode onAuthURL
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
 handleProfile url =
@@ -111,5 +111,5 @@ loginPage :: RouteT AuthURL (ServerPartT IO) Response
 loginPage =
     appTemplate "login" () $
       <ol>
-       <li><a href=(A_OpenIdProvider Google)>Google</a></li>
+       <li><a href=(A_OpenIdProvider LoginMode Google)>Google</a></li>
       </ol>

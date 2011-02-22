@@ -62,6 +62,7 @@ import           Happstack.Data.IxSet (IxSet, inferIxSet, noCalcs)
 import Happstack.Data.IxSet ((@=), getOne, updateIx)
 import System.Random              (randomRIO)
 import Web.Authenticate.OpenId
+import Web.Routes
 import Happstack.Server
 
 newtype AuthId = AuthId { unAuthId :: Integer }
@@ -69,6 +70,10 @@ newtype AuthId = AuthId { unAuthId :: Integer }
 instance Version AuthId
 $(deriveSerialize ''AuthId)
 $(deriveNewData [''AuthId])
+
+instance PathInfo AuthId where
+    toPathSegments (AuthId i) = toPathSegments i
+    fromPathSegments = AuthId <$> fromPathSegments
 
 succAuthId :: AuthId -> AuthId
 succAuthId (AuthId i) = AuthId (succ i)
@@ -148,7 +153,6 @@ $(deriveSerialize ''AuthToken)
 instance Version AuthToken
 
 $(inferIxSet "AuthTokens" ''AuthToken 'noCalcs [''String, ''AuthId])
-
 
 -- * AuthState
 

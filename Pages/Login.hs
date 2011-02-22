@@ -24,7 +24,7 @@ import           Data.Set         (Set)
 import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import Data.Time.Clock            (getCurrentTime)
-import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, ServerPartT, addCookie, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse)
+import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, ServerPartT, addCookie, escape, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse)
 import Happstack.State            (query, update)
 import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, genElement)
 import State.Auth
@@ -40,20 +40,22 @@ import Web.Routes.XMLGenT
 
 -- * AuthURL stuff
 
-googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => Maybe String -> m Response
-googlePage realm =
-    do openIdUrl <- showURL A_OpenId
+googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => AuthMode -> Maybe String -> m Response
+googlePage authMode realm =
+    do openIdUrl <- showURL (A_OpenId authMode)
        gotoURL <- liftIO $ getForwardUrl google openIdUrl realm []
-       seeOther gotoURL (toResponse gotoURL)
+       seeOther gotoURL (toResponse gotoURL)              
 
 -- this verifies the identifier
 -- and sets authToken cookie
 -- if the identifier was not associated with an AuthId, then a new AuthId will be created and associated with it.
-openIdPage :: String -> RouteT AuthURL (ServerPartT IO) Response -- (Maybe AuthId)
-openIdPage onAuthURL = 
+openIdPage :: AuthMode -> String -> RouteT AuthURL (ServerPartT IO) Response -- (Maybe AuthId)
+openIdPage LoginMode onAuthURL = 
     do identifier <- getIdentifier
        addAuthIdsCookie identifier
        seeOther onAuthURL (toResponse ())
+
+
 
 -- this get's the identifier the openid provider provides. It is our only chance to capture the Identifier. So, before we send a Response we need to have some sort of cookie set that identifies the user. We can not just put the identifier in the cookie because we don't want some one to fake it.
 getIdentifier :: (Happstack m) => m Identifier
@@ -84,11 +86,11 @@ addAuthIdsCookie identifier =
 
 pickAuthId :: RouteT ProfileURL (ServerPartT IO) AuthId
 pickAuthId =
-    do (Just authToken) <- getAuthToken -- FIXME
+    do (Just authToken) <- getAuthToken -- FIXME: Just 
        case tokenAuthId authToken of
          (Just authId) -> return authId
          Nothing ->
-             do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME
+             do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
                 case Set.size authIds of
                   0 -> do authId <- update (NewAuthMethod (tokenAuthMethod authToken))
                           update (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
@@ -96,7 +98,18 @@ pickAuthId =
                   1 -> do let aid = head $ Set.toList authIds
                           update (UpdateAuthToken (authToken { tokenAuthId = Just aid }))
                           return aid
-                  n -> undefined -- FIXME
+                  n -> escape $ authPicker authIds
+
+authPicker :: Set AuthId -> RouteT ProfileURL (ServerPartT IO) Response
+authPicker authIds =
+    appTemplate "Pick An Auth" ()
+                <div>
+                 <ul><% mapM auth (Set.toList authIds) %></ul>
+                </div>
+    where
+      auth authId =
+          <li><a href=(P_SetAuthId authId)><% show authId %></a></li> -- FIXME: give a more informative view
+
 
 -- now that we have things narrowed down to a single 'AuthId', pick which personality we want to be
 pickProfile :: String -> RouteT ProfileURL (ServerPartT IO) Response
