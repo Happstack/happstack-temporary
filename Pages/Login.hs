@@ -40,11 +40,46 @@ import Web.Routes.XMLGenT
 
 -- * AuthURL stuff
 
-googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => AuthMode -> Maybe String -> m Response
+loginPage :: RouteT AuthURL (ServerPartT IO) Response
+loginPage =
+    appTemplate "login" () $
+      <ol>
+       <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google</li>
+       <li><a href=(A_OpenIdProvider LoginMode Yahoo)      >Login</a> with your Yahoo Account</li>
+       <li><a href=(A_OpenIdProvider LoginMode LiveJournal)>Login</a> with your Live Journal Account</li>
+       <li><a href=(A_OpenIdProvider LoginMode Myspace)    >Login</a> with your Myspace Account</li>
+       <li><a href=(A_OpenIdProvider LoginMode Generic)    >Login</a> with your OpenId Account</li>
+      </ol>
+
+addAuthPage :: RouteT AuthURL (ServerPartT IO) Response
+addAuthPage =
+    appTemplate "login" () $
+      <ol>
+       <li><a href=(A_OpenIdProvider AddIdentifierMode Google)     >Add</a> your Google</li>
+       <li><a href=(A_OpenIdProvider AddIdentifierMode Yahoo)      >Add</a> your Yahoo Account</li>
+       <li><a href=(A_OpenIdProvider AddIdentifierMode LiveJournal)>Add</a> your Live Journal Account</li>
+       <li><a href=(A_OpenIdProvider AddIdentifierMode Myspace)    >Add</a> your Myspace Account</li>
+       <li><a href=(A_OpenIdProvider AddIdentifierMode Generic)    >Add</a> your OpenId Account</li>
+      </ol>
+
+googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => 
+              AuthMode     -- ^ authentication mode
+           -> Maybe String -- ^ realm
+           -> m Response
 googlePage authMode realm =
     do openIdUrl <- showURL (A_OpenId authMode)
        gotoURL <- liftIO $ getForwardUrl google openIdUrl realm []
        seeOther gotoURL (toResponse gotoURL)              
+
+yahooPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => 
+              AuthMode     -- ^ authentication mode
+           -> Maybe String -- ^ realm
+           -> m Response
+yahooPage authMode realm =
+    do openIdUrl <- showURL (A_OpenId authMode)
+       gotoURL <- liftIO $ getForwardUrl yahoo openIdUrl realm []
+       seeOther gotoURL (toResponse gotoURL)              
+
 
 -- this verifies the identifier
 -- and sets authToken cookie
@@ -54,8 +89,14 @@ openIdPage LoginMode onAuthURL =
     do identifier <- getIdentifier
        addAuthIdsCookie identifier
        seeOther onAuthURL (toResponse ())
-
-
+openIdPage AddIdentifierMode onAuthURL =
+    do identifier <- getIdentifier
+       mAuthId <- getAuthId
+       case mAuthId of
+         Nothing       -> undefined
+         (Just authId) ->
+             do update (AddAuthMethod (AuthIdentifier identifier) authId)
+                seeOther onAuthURL (toResponse ())
 
 -- this get's the identifier the openid provider provides. It is our only chance to capture the Identifier. So, before we send a Response we need to have some sort of cookie set that identifies the user. We can not just put the identifier in the cookie because we don't want some one to fake it.
 getIdentifier :: (Happstack m) => m Identifier

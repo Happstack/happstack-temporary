@@ -70,6 +70,7 @@ instance Arbitrary AuthMode where
 
 data AuthURL 
     = A_Login
+    | A_AddAuth
     | A_Logout
     | A_Local
     | A_OpenId AuthMode
@@ -80,6 +81,7 @@ data AuthURL
 
 instance Arbitrary AuthURL where
     arbitrary = oneof [ return A_Login
+                      , return A_AddAuth
                       , return A_Logout
                       , return A_Local
                       , A_OpenId <$> arbitrary
@@ -93,6 +95,7 @@ instance Arbitrary AuthURL where
 
 instance PathInfo AuthURL where
     toPathSegments A_Login                        = ["login"]
+    toPathSegments A_AddAuth                      = ["add_auth"]
     toPathSegments A_Logout                       = ["logout"]
     toPathSegments A_Local                        = ["local"]
     toPathSegments (A_OpenId authMode)            = "openid_return" : toPathSegments authMode
@@ -104,6 +107,8 @@ instance PathInfo AuthURL where
     fromPathSegments =
         msum [ do segment "login"
                   return A_Login
+             , do segment "add_auth"
+                  return A_AddAuth
              , do segment "logout"
                   return A_Logout
              , do segment "local"

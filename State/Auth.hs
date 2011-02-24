@@ -23,7 +23,7 @@ module State.Auth
     , DeleteAuthToken(..)
     , AuthTokenAuthId(..)
     , GenAuthId(..)
-    , AddAuthIdentifier(..)
+    , AddAuthMethod(..)
     , NewAuthMethod(..)
     , RemoveAuthIdentifier(..)
     , IdentifierAuthIds(..)
@@ -143,11 +143,12 @@ $(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''AuthMethod, ''Identifier
 
 -- * AuthToken
 
-data AuthToken = AuthToken { tokenString  :: String
-                           , tokenExpires :: UTCTime
-                           , tokenAuthId  :: Maybe AuthId
-                           , tokenAuthMethod :: AuthMethod
-                           }
+data AuthToken 
+    = AuthToken { tokenString     :: String
+                , tokenExpires    :: UTCTime
+                , tokenAuthId     :: Maybe AuthId
+                , tokenAuthMethod :: AuthMethod
+                }
       deriving (Eq, Ord, Data, Show, Typeable)
 $(deriveSerialize ''AuthToken)
 instance Version AuthToken
@@ -280,10 +281,10 @@ checkUserPass username password =
 
 -- ** AuthMap
 
-addAuthIdentifier :: Identifier -> AuthId -> Update AuthState ()
-addAuthIdentifier identifier authid =
+addAuthMethod :: AuthMethod -> AuthId -> Update AuthState ()
+addAuthMethod authMethod authid =
     do as@(AuthState{..}) <- ask
-       put $ as { authMaps = IxSet.insert (AuthMap (AuthIdentifier identifier) authid) authMaps }
+       put $ as { authMaps = IxSet.insert (AuthMap authMethod authid) authMaps }
 
 newAuthMethod :: AuthMethod -> Update AuthState AuthId
 newAuthMethod authMethod =
@@ -398,7 +399,7 @@ $(mkMethods ''AuthState [ 'checkUserPass
                         , 'deleteAuthToken
                         , 'authTokenAuthId
                         , 'genAuthId
-                        , 'addAuthIdentifier
+                        , 'addAuthMethod
                         , 'newAuthMethod
                         , 'removeAuthIdentifier
                         , 'identifierAuthIds

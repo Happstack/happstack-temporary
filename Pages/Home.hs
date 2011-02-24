@@ -22,5 +22,5 @@ homePage =
          (Just (UserId uid)) ->
              appTemplate "logged in." ()
                <div>
-                <p>You are logged in as <% show uid %>. You can logout <a href=(U_Auth A_Logout)>here</a>.</p>
+                <p>You are logged in as <% show uid %>. You can logout <a href=(U_Auth A_Logout)>here</a>. You can add an additional auth method <a href=(U_Auth A_AddAuth)>here</a>.</p>
                </div>

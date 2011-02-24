@@ -97,19 +97,15 @@ handle url =
 handleAuth :: String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
 handleAuth onAuthURL url =
     case url of
-      A_Login                   -> loginPage
-      A_Logout                  -> logoutPage
+      A_Login                            -> loginPage
+      A_AddAuth                          -> addAuthPage
+      A_Logout                           -> logoutPage
       (A_OpenIdProvider authMode Google) -> googlePage authMode (Just "http://*.n-heptane.com:8000/") 
-      (A_OpenId authMode)           -> openIdPage authMode onAuthURL
+      (A_OpenIdProvider authMode Yahoo)  -> yahooPage authMode (Just "http://*.n-heptane.com:8000/") 
+      (A_OpenId authMode)                -> openIdPage authMode onAuthURL
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
 handleProfile url =
     case url of
       P_PickProfile -> pickProfile "/"
 
-loginPage :: RouteT AuthURL (ServerPartT IO) Response
-loginPage =
-    appTemplate "login" () $
-      <ol>
-       <li><a href=(A_OpenIdProvider LoginMode Google)>Google</a></li>
-      </ol>
