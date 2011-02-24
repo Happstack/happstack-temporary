@@ -101,11 +101,11 @@ handleAuth onAuthURL url =
       A_AddAuth                          -> addAuthPage
       A_Logout                           -> logoutPage
       (A_OpenIdProvider authMode Google) -> googlePage authMode (Just "http://*.n-heptane.com:8000/") 
-      (A_OpenIdProvider authMode Yahoo)  -> yahooPage authMode (Just "http://*.n-heptane.com:8000/") 
+      (A_OpenIdProvider authMode Yahoo)  -> yahooPage  authMode (Just "http://*.n-heptane.com:8000/") 
       (A_OpenId authMode)                -> openIdPage authMode onAuthURL
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
 handleProfile url =
     case url of
-      P_PickProfile -> pickProfile "/"
-
+      P_PickProfile        -> pickProfile "/"
+      (P_SetAuthId authId) -> setAuthIdPage authId
