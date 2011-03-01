@@ -1,20 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeFamilies, UndecidableInstances #-}
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Pages.Login where
-{-
-    ( googlePage
-    , openIdPage
-    )
-    ( genericOpenIdPage
-    , googlePage
-    , liveJournalPage
-    , loginPage
-    , localLoginPage
-    , myspacePage
-    , openIdPage
-    , yahooPage
-    ) 
--}
+
 import AuthURL
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), optional)
 import Control.Monad              (replicateM)
@@ -25,14 +12,17 @@ import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import Data.Time.Clock            (getCurrentTime)
 import Happstack.Server           (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Happstack, ServerPartT, addCookie, escape, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse, unauthorized)
+import Happstack.Server.HSP.HTML  (XML)
 import Happstack.State            (query, update)
-import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, genElement)
+import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, genElement, unXMLGenT)
+import HSP.ServerPartT()
 import State.Auth
 import Pages.AppTemplate
 import Profile
 import ProfileURL
 import Text.Digestive
 import Text.Digestive.HSP.Html4
+import Types (UserId(..))
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Routes                 (RouteT, ShowURL, showURL, URL)
@@ -40,9 +30,8 @@ import Web.Routes.XMLGenT
 
 -- * AuthURL stuff
 
-loginPage :: RouteT AuthURL (ServerPartT IO) Response
+loginPage :: XMLGenT (RouteT AuthURL (ServerPartT IO)) XML
 loginPage =
-    appTemplate "login" () $
       <ol>
        <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google</li>
        <li><a href=(A_OpenIdProvider LoginMode Yahoo)      >Login</a> with your Yahoo Account</li>
@@ -51,9 +40,8 @@ loginPage =
        <li><a href=(A_OpenIdProvider LoginMode Generic)    >Login</a> with your OpenId Account</li>
       </ol>
 
-addAuthPage :: RouteT AuthURL (ServerPartT IO) Response
+addAuthPage :: XMLGenT (RouteT AuthURL (ServerPartT IO)) XML
 addAuthPage =
-    appTemplate "login" () $
       <ol>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Google)     >Add</a> your Google</li>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Yahoo)      >Add</a> your Yahoo Account</li>
@@ -61,6 +49,27 @@ addAuthPage =
        <li><a href=(A_OpenIdProvider AddIdentifierMode Myspace)    >Add</a> your Myspace Account</li>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Generic)    >Add</a> your OpenId Account</li>
       </ol>
+
+
+authPicker :: Set AuthId -> RouteT ProfileURL (ServerPartT IO) Response
+authPicker authIds =
+    appTemplate "Pick An Auth" ()
+                <div>
+                 <ul><% mapM auth (Set.toList authIds) %></ul>
+                </div>
+    where
+      auth authId =
+          <li><a href=(P_SetAuthId authId)><% show authId %></a></li> -- FIXME: give a more informative view. 
+
+personalityPicker :: Set Profile -> RouteT ProfileURL (ServerPartT IO) Response
+personalityPicker profiles =
+    appTemplate "Pick A Personality" ()
+                <div>
+                 <ul><% mapM personality (Set.toList profiles) %></ul>
+                </div>
+    where
+      personality profile =
+          <li><a href=(P_SetPersonality (userId profile))><% nickName profile %></a></li>
 
 googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => 
               AuthMode     -- ^ authentication mode
@@ -125,33 +134,23 @@ addAuthIdsCookie identifier =
 
 -- can we pick an AuthId with only the information in the Auth stuff? Or should that be a profile action ?
 
-pickAuthId :: RouteT ProfileURL (ServerPartT IO) AuthId
+pickAuthId :: RouteT ProfileURL (ServerPartT IO) (Either (Set AuthId) AuthId)
 pickAuthId =
     do (Just authToken) <- getAuthToken -- FIXME: Just 
        case tokenAuthId authToken of
-         (Just authId) -> return authId
+         (Just authId) -> return (Right authId)
          Nothing ->
              do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
                 case Set.size authIds of
                   0 -> do authId <- update (NewAuthMethod (tokenAuthMethod authToken))
                           update (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
-                          return authId
+                          return (Right authId)
                   1 -> do let aid = head $ Set.toList authIds
                           update (UpdateAuthToken (authToken { tokenAuthId = Just aid }))
-                          return aid
-                  n -> escape $ authPicker authIds
+                          return (Right aid)
+                  n -> return (Left authIds)
 
-authPicker :: Set AuthId -> RouteT ProfileURL (ServerPartT IO) Response
-authPicker authIds =
-    appTemplate "Pick An Auth" ()
-                <div>
-                 <ul><% mapM auth (Set.toList authIds) %></ul>
-                </div>
-    where
-      auth authId =
-          <li><a href=(P_SetAuthId authId)><% show authId %></a></li> -- FIXME: give a more informative view
-
-setAuthIdPage :: AuthId -> RouteT ProfileURL (ServerPartT IO) Response
+setAuthIdPage :: AuthId -> RouteT ProfileURL (ServerPartT IO) Bool
 setAuthIdPage authId =
     do mAuthToken <- getAuthToken
        case mAuthToken of
@@ -160,38 +159,32 @@ setAuthIdPage authId =
              do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
                 if Set.member authId authIds
                    then do update (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
-                           seeOther "/" (toResponse "") -- FIXME: don't hardcode destination
-                   else unauthorized =<< 
-                           appTemplate "unauthorized" ()
-                             <p>Attempted to set AuthId to <% show $ unAuthId authId %>, but failed because the Identifier is not associated with that AuthId.</p>
+                           return True
+                   else return False
 
+data PickProfile 
+    = Picked UserId
+    | PickPersonality (Set Profile)
+    | PickAuthId      (Set AuthId)
 
--- now that we have things narrowed down to a single 'AuthId', pick which personality we want to be
-pickProfile :: String -> RouteT ProfileURL (ServerPartT IO) Response
-pickProfile onLoginURL =
-    do aid <- pickAuthId
-       mUid <- query (AuthIdUserId aid)
-       case mUid of
-         Nothing ->
-             do profiles <- query (AuthIdProfiles aid)
-                case Set.size profiles of
-                  0 -> do uid <- update (CreateNewProfile (Set.singleton aid))
-                          update (SetAuthIdUserId aid uid)
-                          seeOther onLoginURL (toResponse onLoginURL)
-                  1 -> do let profile = head $ Set.toList profiles
-                          update (SetAuthIdUserId aid (userId profile))
-                          seeOther onLoginURL (toResponse onLoginURL)
-                  n -> do personalityPicker profiles
-         (Just uid) ->
-             seeOther onLoginURL (toResponse onLoginURL)
-
-personalityPicker :: Set Profile -> RouteT ProfileURL (ServerPartT IO) Response
-personalityPicker profiles =
-    appTemplate "Pick A Personality" ()
-                <div>
-                 <ul><% mapM personality (Set.toList profiles) %></ul>
-                </div>
-    where
-      personality profile =
-          <li><a href=(P_SetPersonality (userId profile))><% nickName profile %></a></li>
-                
+pickProfile :: RouteT ProfileURL (ServerPartT IO) PickProfile
+pickProfile =
+    do eAid <- pickAuthId
+       case eAid of
+         (Right aid) ->
+             do mUid <- query (AuthIdUserId aid)
+                case mUid of
+                  Nothing ->
+                      do profiles <- query (AuthIdProfiles aid)
+                         case Set.size profiles of
+                           0 -> do uid <- update (CreateNewProfile (Set.singleton aid))
+                                   update (SetAuthIdUserId aid uid)
+                                   return (Picked uid)
+--                                   seeOther onLoginURL (toResponse onLoginURL)
+                           1 -> do let profile = head $ Set.toList profiles
+                                   update (SetAuthIdUserId aid (userId profile))
+                                   return (Picked (userId profile))
+                           n -> do return (PickPersonality profiles)
+                  (Just uid) ->
+                      return (Picked uid)
+         (Left aids) -> return (PickAuthId aids)

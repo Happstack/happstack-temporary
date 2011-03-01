@@ -72,9 +72,9 @@ data AuthURL
     = A_Login
     | A_AddAuth
     | A_Logout
-    | A_Local
     | A_OpenId AuthMode
     | A_OpenIdProvider AuthMode OpenIdProvider
+    | A_Local
     | A_CreateAccount
     | A_ChangePassword
       deriving (Eq, Ord, Read, Show, Data, Typeable)
