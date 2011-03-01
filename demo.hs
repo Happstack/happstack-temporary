@@ -14,6 +14,8 @@ import Pages.AppTemplate
 import Pages.Home
 import Pages.Login
 import Pages.Logout
+import Pages.Auth
+import Pages.Profile
 import Profile
 import State.Auth
 import SiteURL
