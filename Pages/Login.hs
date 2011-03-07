@@ -73,32 +73,32 @@ personalityPicker profiles =
       personality profile =
           <li><a href=(P_SetPersonality (userId profile))><% nickName profile %></a></li>
 
-type ProviderPage = OpenIdURL -> AuthMode -> RouteT OpenIdURL (ServerPartT IO) Response
+type ProviderPage p = (OpenIdURL p) -> AuthMode -> RouteT (OpenIdURL p) (ServerPartT IO) Response
 
-providerPage :: OpenIdProvider -> ProviderPage
+providerPage :: OpenIdProvider -> ProviderPage p
 providerPage Google      = googlePage
 providerPage Yahoo       = yahooPage
 providerPage LiveJournal = liveJournalPage
 
-googlePage :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) =>
-              OpenIdURL
+googlePage :: (Happstack m, ShowURL m, URL m ~ (OpenIdURL p)) =>
+              (OpenIdURL p)
            -> AuthMode
            -> m Response
 googlePage _here authMode = 
     do u <- showURLParams (O_Connect authMode) [("url", google)]
        seeOther u (toResponse ())
 
-yahooPage :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) => 
-             OpenIdURL
+yahooPage :: (Happstack m, ShowURL m, URL m ~ (OpenIdURL p)) => 
+             (OpenIdURL p)
           -> AuthMode
           -> m Response
 yahooPage _here authMode =
     do u <- showURLParams (O_Connect authMode) [("url", yahoo)]
        seeOther u (toResponse ())
 
-liveJournalPage :: OpenIdURL
+liveJournalPage :: OpenIdURL p
                 -> AuthMode
-                -> RouteT OpenIdURL (ServerPartT IO) Response
+                -> RouteT (OpenIdURL p) (ServerPartT IO) Response
 liveJournalPage here authMode =
     do actionURL <- showURL here
        appTemplate "Login" () $
@@ -110,14 +110,14 @@ liveJournalPage here authMode =
       where 
         usernameForm = 
             label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* submit "Connect"
-        handleSuccess :: String -> XMLGenT (RouteT OpenIdURL (ServerPartT IO)) Response
+        handleSuccess :: String -> XMLGenT (RouteT (OpenIdURL p) (ServerPartT IO)) Response
         handleSuccess username =
             do u <- showURLParams (O_Connect authMode) [("url", livejournal username)]
                seeOther u (toResponse ())
 
-handleFailure :: [(FormRange, String)] -> [XMLGenT
-                         (RouteT OpenIdURL (ServerPartT IO))
-                         (HSX.XML (RouteT OpenIdURL (ServerPartT IO)))] -> XMLGenT (RouteT OpenIdURL (ServerPartT IO)) Response
+handleFailure :: [(FormRange, String)] 
+              -> [XMLGenT (RouteT (OpenIdURL p) (ServerPartT IO)) (HSX.XML (RouteT (OpenIdURL p) (ServerPartT IO)))] 
+              -> XMLGenT (RouteT (OpenIdURL p) (ServerPartT IO)) Response
 handleFailure errs formXML =
             toResponse <$> appTemplate' "Login" ()
                <div id="main">

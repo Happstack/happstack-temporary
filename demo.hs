@@ -97,7 +97,7 @@ handle realm url =
                                 nestURL U_Auth $ handleAuth providerPage realm onAuthURL auth
       (U_Profile profile) -> nestURL U_Profile $ handleProfile profile
 
-handleAuth :: (OpenIdProvider -> ProviderPage) -> Maybe String -> String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
+handleAuth :: (OpenIdProvider -> ProviderPage OpenIdProvider) -> Maybe String -> String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
 handleAuth providerPage realm onAuthURL url =
     case url of
       A_Login           -> appTemplate "Login"    () loginPage
@@ -105,19 +105,19 @@ handleAuth providerPage realm onAuthURL url =
       A_Logout          -> logoutPage
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId providerPage realm onAuthURL oidURL
 
-handleOpenId :: (OpenIdProvider -> ProviderPage)
+handleOpenId :: (p -> ProviderPage p)
              -> Maybe String -- ^ realm
              -> String -- ^ onAuthURL
-             -> OpenIdURL -- ^ this url
-             -> RouteT OpenIdURL (ServerPartT IO) Response
+             -> (OpenIdURL p) -- ^ this url
+             -> RouteT (OpenIdURL p) (ServerPartT IO) Response
 handleOpenId providerPage realm onAuthURL url =
     case url of
-      (O_OpenIdProvider authMode provider) -> 
-          providerPage provider url authMode 
       (O_OpenId authMode)                  -> openIdPage authMode onAuthURL
       (O_Connect authMode)                 -> 
           do url <- look "url"
              connect authMode realm url
+      (O_OpenIdProvider authMode provider) -> 
+          providerPage provider url authMode 
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
 handleProfile url =

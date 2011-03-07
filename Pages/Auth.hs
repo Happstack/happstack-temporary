@@ -16,7 +16,7 @@ import Web.Routes
 -- this verifies the identifier
 -- and sets authToken cookie
 -- if the identifier was not associated with an AuthId, then a new AuthId will be created and associated with it.
-openIdPage :: AuthMode -> String -> RouteT OpenIdURL (ServerPartT IO) Response -- (Maybe AuthId)
+openIdPage :: AuthMode -> String -> RouteT (OpenIdURL p) (ServerPartT IO) Response -- (Maybe AuthId)
 openIdPage LoginMode onAuthURL = 
     do identifier <- getIdentifier
        addAuthIdsCookie identifier
@@ -53,7 +53,7 @@ addAuthIdsCookie identifier =
        addAuthCookie authId (AuthIdentifier identifier)
        return authId
 
-connect :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) => 
+connect :: (Happstack m, ShowURL m, URL m ~ (OpenIdURL p)) => 
               AuthMode     -- ^ authentication mode
            -> Maybe String -- ^ realm
            -> String       -- ^ openid url
