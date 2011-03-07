@@ -1,5 +1,6 @@
 module Pages.Profile where
 
+import Control.Applicative (Alternative(..))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import Profile
@@ -30,7 +31,7 @@ pickAuthId =
                           return (Right aid)
                   n -> return (Left authIds)
 
-setAuthIdPage :: AuthId -> RouteT ProfileURL (ServerPartT IO) Bool
+setAuthIdPage :: (Alternative m, Happstack m) => AuthId -> m Bool
 setAuthIdPage authId =
     do mAuthToken <- getAuthToken
        case mAuthToken of

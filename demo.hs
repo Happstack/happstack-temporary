@@ -69,6 +69,7 @@ printResponse res =
 
 impl :: String -> ServerPartT IO Response
 impl baseURI = do
+    decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
     rq <- askRq
     liftIO $ print rq
     msum [ do r <- implSite_ baseURI "web/" (spec (Just "http://*.n-heptane.com:8000/"))
@@ -93,18 +94,30 @@ handle realm url =
     case url of
       U_HomePage          -> homePage
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
-                                nestURL U_Auth $ handleAuth realm onAuthURL auth
+                                nestURL U_Auth $ handleAuth providerPage realm onAuthURL auth
       (U_Profile profile) -> nestURL U_Profile $ handleProfile profile
 
-handleAuth :: Maybe String -> String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
-handleAuth realm onAuthURL url =
+handleAuth :: (OpenIdProvider -> ProviderPage) -> Maybe String -> String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
+handleAuth providerPage realm onAuthURL url =
     case url of
-      A_Login                            -> appTemplate "Login"    () loginPage
-      A_AddAuth                          -> appTemplate "Add Auth" () addAuthPage
-      A_Logout                           -> logoutPage
-      (A_OpenIdProvider authMode Google) -> googlePage authMode realm
-      (A_OpenIdProvider authMode Yahoo)  -> yahooPage  authMode realm
-      (A_OpenId authMode)                -> openIdPage authMode onAuthURL
+      A_Login           -> appTemplate "Login"    () loginPage
+      A_AddAuth         -> appTemplate "Add Auth" () addAuthPage
+      A_Logout          -> logoutPage
+      (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId providerPage realm onAuthURL oidURL
+
+handleOpenId :: (OpenIdProvider -> ProviderPage)
+             -> Maybe String -- ^ realm
+             -> String -- ^ onAuthURL
+             -> OpenIdURL -- ^ this url
+             -> RouteT OpenIdURL (ServerPartT IO) Response
+handleOpenId providerPage realm onAuthURL url =
+    case url of
+      (O_OpenIdProvider authMode provider) -> 
+          providerPage provider url authMode 
+      (O_OpenId authMode)                  -> openIdPage authMode onAuthURL
+      (O_Connect authMode)                 -> 
+          do url <- look "url"
+             connect authMode realm url
 
 handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
 handleProfile url =
@@ -113,8 +126,10 @@ handleProfile url =
           do r <- pickProfile
              case r of
                (Picked {})                -> seeOther "/" (toResponse "/")
-               (PickPersonality profiles) -> personalityPicker profiles
-               (PickAuthId      authIds)  -> authPicker authIds
+               (PickPersonality profiles) -> 
+                   appTemplate "Pick Personality" () (personalityPicker profiles)
+               (PickAuthId      authIds)  -> 
+                   appTemplate "Pick Auth" () (authPicker authIds)
                    
                               
       (P_SetAuthId authId) -> 

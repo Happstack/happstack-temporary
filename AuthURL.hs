@@ -72,58 +72,80 @@ data AuthURL
     = A_Login
     | A_AddAuth
     | A_Logout
-    | A_OpenId AuthMode
-    | A_OpenIdProvider AuthMode OpenIdProvider
     | A_Local
     | A_CreateAccount
     | A_ChangePassword
+    | A_OpenId OpenIdURL
       deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+data OpenIdURL
+    = O_OpenId AuthMode
+    | O_OpenIdProvider AuthMode OpenIdProvider
+    | O_Connect AuthMode
+      deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+instance Arbitrary OpenIdURL where
+    arbitrary = oneof [ O_OpenId <$> arbitrary
+                      , O_OpenIdProvider <$> arbitrary <*> arbitrary
+                      , O_Connect <$> arbitrary
+                      ]
 
 instance Arbitrary AuthURL where
     arbitrary = oneof [ return A_Login
-                      , return A_AddAuth
                       , return A_Logout
                       , return A_Local
-                      , A_OpenId <$> arbitrary
-                      , A_OpenIdProvider <$> arbitrary <*> arbitrary
+                      , return A_AddAuth
                       , return A_CreateAccount
                       , return A_ChangePassword
+                      , A_OpenId <$> arbitrary
                       ]
 
 
 -- $(derivePathInfo ''AuthURL)
 
-instance PathInfo AuthURL where
-    toPathSegments A_Login                        = ["login"]
-    toPathSegments A_AddAuth                      = ["add_auth"]
-    toPathSegments A_Logout                       = ["logout"]
-    toPathSegments A_Local                        = ["local"]
-    toPathSegments (A_OpenId authMode)            = "openid_return" : toPathSegments authMode
-    toPathSegments (A_OpenIdProvider authMode provider) 
+instance PathInfo OpenIdURL where
+    toPathSegments (O_OpenId authMode)            = "openid_return" : toPathSegments authMode
+    toPathSegments (O_OpenIdProvider authMode provider) 
                                                   = "openid" : toPathSegments authMode ++ toPathSegments provider
-    toPathSegments A_CreateAccount                = ["create"]
-    toPathSegments A_ChangePassword               = ["change_password"]
+    toPathSegments (O_Connect authMode)           = "connect" : toPathSegments authMode
+
+    fromPathSegments =
+        msum [ do segment "openid_return"
+                  mode <- fromPathSegments
+                  return (O_OpenId mode)
+             , do segment "openid"
+                  authMode <- fromPathSegments
+                  provider <- fromPathSegments
+                  return (O_OpenIdProvider authMode provider)
+             , do segment "connect"
+                  authMode <- fromPathSegments
+                  return (O_Connect authMode)
+             ]
+
+instance PathInfo AuthURL where
+    toPathSegments A_Login          = ["login"]
+    toPathSegments A_Logout         = ["logout"]
+    toPathSegments A_Local          = ["local"]
+    toPathSegments A_CreateAccount  = ["create"]
+    toPathSegments A_ChangePassword = ["change_password"]
+    toPathSegments A_AddAuth        = ["add_auth"]
+    toPathSegments (A_OpenId o) = "openid" : toPathSegments o
 
     fromPathSegments =
         msum [ do segment "login"
                   return A_Login
-             , do segment "add_auth"
-                  return A_AddAuth
              , do segment "logout"
                   return A_Logout
              , do segment "local"
                   return A_Local
-             , do segment "openid_return"
-                  mode <- fromPathSegments
-                  return (A_OpenId mode)
-             , do segment "openid"
-                  authMode <- fromPathSegments
-                  provider <- fromPathSegments
-                  return (A_OpenIdProvider authMode provider)
              , do segment "create"
                   return A_CreateAccount
              , do segment "change_password"
                   return A_ChangePassword
+             , do segment "openid"
+                  A_OpenId <$> fromPathSegments
+             , do segment "add_auth"
+                  return A_AddAuth
              ]
 
 authUrlInverse :: Property
