@@ -73,9 +73,8 @@ personalityPicker profiles =
       personality profile =
           <li><a href=(P_SetPersonality (userId profile))><% nickName profile %></a></li>
 
-type ProviderPage p = (OpenIdURL p) -> AuthMode -> RouteT (OpenIdURL p) (ServerPartT IO) Response
 
-providerPage :: OpenIdProvider -> ProviderPage p
+providerPage :: OpenIdProvider -> ProviderPage (RouteT (OpenIdURL p) (ServerPartT IO)) p
 providerPage Google      = googlePage
 providerPage Yahoo       = yahooPage
 providerPage LiveJournal = liveJournalPage

@@ -2,6 +2,7 @@
 module Pages.Auth where
 
 import AuthURL
+import Control.Applicative
 import Control.Monad.Trans
 import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
@@ -16,7 +17,10 @@ import Web.Routes
 -- this verifies the identifier
 -- and sets authToken cookie
 -- if the identifier was not associated with an AuthId, then a new AuthId will be created and associated with it.
-openIdPage :: AuthMode -> String -> RouteT (OpenIdURL p) (ServerPartT IO) Response -- (Maybe AuthId)
+openIdPage :: (Alternative m, Happstack m) =>
+              AuthMode 
+           -> String 
+           -> m Response
 openIdPage LoginMode onAuthURL = 
     do identifier <- getIdentifier
        addAuthIdsCookie identifier
@@ -63,3 +67,19 @@ connect authMode realm url =
        gotoURL <- liftIO $ getForwardUrl url openIdUrl realm []
        seeOther gotoURL (toResponse gotoURL)
 
+type ProviderPage m p = (OpenIdURL p) -> AuthMode -> m Response
+
+handleOpenId :: (Alternative m, Happstack m, ShowURL m, URL m ~ (OpenIdURL p)) =>
+                 (p -> ProviderPage m p)
+             -> Maybe String -- ^ realm
+             -> String -- ^ onAuthURL
+             -> (OpenIdURL p) -- ^ this url
+             -> m Response
+handleOpenId providerPage realm onAuthURL url =
+    case url of
+      (O_OpenId authMode)                  -> openIdPage authMode onAuthURL
+      (O_Connect authMode)                 -> 
+          do url <- look "url"
+             connect authMode realm url
+      (O_OpenIdProvider authMode provider) -> 
+          providerPage provider url authMode 
