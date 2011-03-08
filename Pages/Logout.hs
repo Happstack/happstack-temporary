@@ -3,17 +3,17 @@
 module Pages.Logout where
 
 import AuthURL
+import Control.Applicative(Alternative(..))
 import Pages.AppTemplate
 import State.Auth
 import Happstack.Server
 import HSP
+import qualified HSX.XMLGenerator as HSX
 import Web.Routes
 import Web.Routes.Happstack
 
-
-logoutPage :: RouteT AuthURL (ServerPartT IO) Response
+logoutPage :: (XMLGenerator m, Alternative m, Happstack m, ShowURL m, URL m ~ AuthURL, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
 logoutPage =
     do deleteAuthCookie
-       appTemplate "Logout" () 
-         <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
+       <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
        

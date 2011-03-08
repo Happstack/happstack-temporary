@@ -1,17 +1,19 @@
-{-# LANGUAGE DeriveDataTypeable, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, TypeFamilies, TypeOperators #-}
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Main where
 
 import AuthURL
 import Control.Applicative (Alternative(..))
 import Control.Concurrent (forkIO, killThread)
-import Control.Monad (msum, mzero)
+import Control.Monad (liftM, msum, mzero)
 import Control.Monad.Trans (liftIO)
 import Data.Data
 import Happstack.State
 import Happstack.Server
+import Happstack.Server.HSP.HTML (defaultTemplate)
 import HSP
-import Pages.AppTemplate
+import qualified HSX.XMLGenerator as HSX
+-- import Pages.AppTemplate
 import Pages.Home
 import Pages.Login
 import Pages.Logout
@@ -25,6 +27,8 @@ import Web.Routes
 import Web.Routes.Happstack          (implSite_)
 import Web.Routes.TH
 import Web.Routes.MTL
+
+defaultTemplate' t h b = liftM toResponse (defaultTemplate t h b)
 
 data DemoState = DemoState
       deriving (Eq, Read, Show, Data, Typeable)
@@ -95,20 +99,33 @@ handle realm url =
     case url of
       U_HomePage          -> homePage
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
-                                nestURL U_Auth $ handleAuth providerPage realm onAuthURL auth
-      (U_Profile profile) -> nestURL U_Profile $ handleProfile profile
-
-handleAuth :: (OpenIdProvider -> ProviderPage (RouteT (OpenIdURL OpenIdProvider) (ServerPartT IO)) OpenIdProvider) -> Maybe String -> String -> AuthURL -> RouteT AuthURL (ServerPartT IO) Response
-handleAuth providerPage realm onAuthURL url =
+                                nestURL U_Auth $ handleAuth defaultTemplate' providerPage realm onAuthURL auth
+      (U_Profile profile) -> nestURL U_Profile $ handleProfile defaultTemplate' profile
+{-
+handleAuth :: ( Happstack m
+              , XMLGenerator m
+              , EmbedAsChild m ()
+              , EmbedAsAttr m (Attr String AuthURL)
+              , ToMessage (HSX.XML m)
+              , Alternative m
+              , ShowURL m
+              , URL m ~ AuthURL
+              ) =>
+              (OpenIdProvider -> (OpenIdURL p) -> AuthMode -> n Response) --  -> ProviderPage n OpenIdProvider)
+           -> Maybe String 
+           -> String 
+           -> AuthURL 
+           -> m Response
+-}
+handleAuth appTemplate providerPage realm onAuthURL url =
     case url of
       A_Login           -> appTemplate "Login"    () loginPage
       A_AddAuth         -> appTemplate "Add Auth" () addAuthPage
-      A_Logout          -> logoutPage
+      A_Logout          -> appTemplate "Logout"   () logoutPage
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId providerPage realm onAuthURL oidURL
 
-
-handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
-handleProfile url =
+-- handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
+handleProfile appTemplate url =
     case url of
       P_PickProfile        -> 
           do r <- pickProfile

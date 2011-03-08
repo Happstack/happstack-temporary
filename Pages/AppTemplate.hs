@@ -11,20 +11,23 @@ import Happstack.Server
 import Happstack.Server.HSP.HTML ()
 import Happstack.Server.HSX ()
 import HSP (XMLGenerator)
+import qualified HSX.XMLGenerator as HSX
 import SiteURL
 import Web.Routes
 import Web.Routes.XMLGenT
 import Web.Routes.Happstack
 
 appTemplate' :: 
-    ( EmbedAsChild (RouteT url (ServerPartT IO)) headers 
-    , EmbedAsChild (RouteT url (ServerPartT IO)) body
-    , EmbedAsAttr  (RouteT url (ServerPartT IO)) (Attr String String)
+    ( Happstack m
+    , XMLGenerator m
+    , EmbedAsChild m headers 
+    , EmbedAsChild m body
+    , EmbedAsAttr  m (Attr String String)
     )
     => String -- ^ title 
     -> headers  -- ^ extra tags to include in \<head\>
     -> body    -- ^ contents to put inside \<body\> 
-    -> XMLGenT (RouteT url (ServerPartT IO)) XML
+    -> XMLGenT m (HSX.XML m)
 appTemplate' title headers body = do 
    <html>
      <head>
@@ -38,14 +41,17 @@ appTemplate' title headers body = do
     </html>
 
 appTemplate :: 
-    ( EmbedAsChild (RouteT url (ServerPartT IO)) headers 
-    , EmbedAsChild (RouteT url (ServerPartT IO)) body
-    , EmbedAsAttr  (RouteT url (ServerPartT IO)) (Attr String String)
+    ( Happstack m
+    , ToMessage (HSX.XML m)
+    , XMLGenerator m
+    , EmbedAsChild m headers 
+    , EmbedAsChild m body
+    , EmbedAsAttr  m (Attr String String)
     )
     => String -- ^ title 
     -> headers  -- ^ extra tags to include in \<head\>
     -> body    -- ^ contents to put inside \<body\> 
-    -> RouteT url (ServerPartT IO) Response
+    -> m Response
 appTemplate title headers body =
     toResponse <$> (unXMLGenT (appTemplate' title headers body))
 
