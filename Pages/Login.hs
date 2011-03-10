@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Pages.Login where
 
-import AuthURL
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), optional)
 import Control.Monad              (replicateM, mplus)
 import Control.Monad.Trans        (MonadIO(liftIO))
@@ -11,23 +10,23 @@ import           Data.Set         (Set)
 import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import Data.Time.Clock            (getCurrentTime)
+import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.AuthURL
+import Happstack.Auth.Core.ProfileURL
+import Happstack.Auth.Core.Profile
 import Happstack.Server           -- (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Input(..), Happstack, ServerPartT, addCookie, escape, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse, unauthorized)
 import Happstack.Server.HSP.HTML  (XML)
 import Happstack.State            (query, update)
 import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, XMLGenerator, genElement, unXMLGenT)
 import HSP.ServerPartT()
 import qualified HSX.XMLGenerator as HSX
-import State.Auth
 import Pages.Auth
 import Pages.AppTemplate
 import Pages.Profile
 import Pages.FormPart
-import Profile
-import ProfileURL
 import Text.Digestive
 import Text.Digestive.Forms.Happstack ()
 import Text.Digestive.HSP.Html4
-import Types (UserId(..))
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Routes                 (RouteT, ShowURL, showURL, showURLParams, URL)

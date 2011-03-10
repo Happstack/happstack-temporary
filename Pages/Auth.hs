@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 module Pages.Auth where
 
-import AuthURL
 import Control.Applicative
 import Control.Monad.Trans
 import Data.Maybe                 (mapMaybe)
@@ -9,7 +8,8 @@ import           Data.Set         (Set)
 import qualified Data.Set as Set
 import Happstack.Server
 import Happstack.State
-import State.Auth
+import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.AuthURL
 import Types
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Routes

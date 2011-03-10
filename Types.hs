@@ -14,19 +14,6 @@ import Web.Routes.XMLGenT
 import Web.Routes.Happstack
 import Web.Routes.MTL
 
-newtype UserId = UserId { unUserId :: Integer }
-      deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version UserId
-$(deriveSerialize ''UserId)
-$(deriveNewData [''UserId])
-
-instance PathInfo UserId where
-    toPathSegments (UserId i) = toPathSegments i
-    fromPathSegments = UserId <$> fromPathSegments
-
-succUserId :: UserId -> UserId
-succUserId (UserId i) = UserId (succ i)
-
 instance EmbedAsAttr (RouteT url (ServerPartT IO)) (Attr String url) where
     asAttr (n := u) = 
         do url <- showURL u

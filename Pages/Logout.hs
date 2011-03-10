@@ -2,10 +2,10 @@
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Pages.Logout where
 
-import AuthURL
 import Control.Applicative(Alternative(..))
 import Pages.AppTemplate
-import State.Auth
+import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.AuthURL
 import Happstack.Server
 import HSP
 import qualified HSX.XMLGenerator as HSX

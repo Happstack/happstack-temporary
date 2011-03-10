@@ -2,7 +2,7 @@
     FlexibleInstances, MultiParamTypeClasses, FlexibleContexts,
     UndecidableInstances, TypeOperators, RecordWildCards
     #-}
-module State.Auth 
+module Happstack.Auth.Core.Auth
     ( UserPass(..)
     , UserName(..)
     , UserPassError(..)
@@ -42,7 +42,6 @@ import Control.Monad        (replicateM)
 import Control.Monad.Reader (ask)
 import Control.Monad.State  (get, put)
 import Control.Monad.Trans  (MonadIO(..))
--- import Crypto.PBKDF2
 import Crypto.PasswordStore
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -350,15 +349,6 @@ authTokenAuthId tokenString =
        case getOne $ authTokens @= tokenString of
          Nothing          -> return Nothing
          (Just authToken) -> return $ (tokenAuthId authToken)
-{-
-authTokenAuthIds :: String -> Query AuthState (Maybe (Set AuthId))
-authTokenAuthIds tokenString =
-    do as@(AuthState{..}) <- ask
-       case getOne $ authTokens @= tokenString of
-         Nothing -> return Nothing
-         (Just authToken) ->
-             return (Just $ tokenAuthId authToken)
--}
 
 -- TODO: 
 --  - expireAuthTokens
@@ -441,54 +431,3 @@ getAuthId =
        case mTokenStr of
          Nothing         -> return Nothing
          (Just tokenStr) -> query (AuthTokenAuthId tokenStr)
-
-{-
--- | hash a password
-mkHashedPass :: UserName    -- ^ username
-             -> String      -- ^ plain-text password
-             -> String      -- ^ salt        
-             -> HashedPass  -- ^ hashed password
-mkHashedPass (UserName username) password =
-    let salt = Salt $ toOctets $ Text.unpack username
-    in pbkdf2 (Password $ toOctets password) salt
--}
-{-
-askAuthById :: AuthId -> Query AuthState (Maybe AuthLocal)
-askAuthById aid =
-    do as <- ask
-       return $ getOne (authsLocal as @= aid)
--}
-
-{-
-addAuthIdToUserId :: AuthId -> UserId -> Update AuthState ()
-addAuthIdToUserId aid uid =
-    do as@AuthState{..} <- get
-       put $ as { authMaps = IxSet.insert (AuthId2UserId aid uid) authMaps }
-
-removeAuthIdToUserId :: AuthId -> UserId -> Update AuthState ()
-removeAuthIdToUserId aid uid =
-    do as@AuthState{..} <- get
-       put $ as { authMaps = IxSet.delete (AuthId2UserId aid uid) authMaps }
-
-addIdentifierToUserId :: Identifier -> UserId -> Update AuthState ()
-addIdentifierToUserId identifier uid =
-    do as@AuthState{..} <- get
-       put $ as { authMaps = IxSet.insert (Identifier2UserId identifier uid) authMaps }
-
-removeIdentifierToUserId :: Identifier -> UserId -> Update AuthState ()
-removeIdentifierToUserId identifier uid =
-    do as@AuthState{..} <- get
-       put $ as { authMaps = IxSet.insert (Identifier2UserId identifier uid) authMaps }
--}
-{-
-data AuthIdentifier
-    = AuthIdentifier { aiIdentifier :: Identifier
-                     , aiAuthId       :: AuthId
-                     }
-    deriving (Eq, Ord, Read, Show, Data, Typeable)
-
-instance Version AuthIdentifier
-$(deriveSerialize ''AuthIdentifier)
-
-$(inferIxSet "AuthsIdentifier" ''AuthIdentifier 'noCalcs [''Identifier, ''AuthId])
--}

@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Main where
 
-import AuthURL
 import Control.Applicative (Alternative(..))
 import Control.Concurrent (forkIO, killThread)
 import Control.Monad (liftM, msum, mzero)
@@ -19,10 +18,11 @@ import Pages.Login
 import Pages.Logout
 import Pages.Auth
 import Pages.Profile
-import Profile
-import State.Auth
+import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.AuthURL
+import Happstack.Auth.Core.Profile
+import Happstack.Auth.Core.ProfileURL
 import SiteURL
-import ProfileURL
 import Web.Routes
 import Web.Routes.Happstack          (implSite_)
 import Web.Routes.TH

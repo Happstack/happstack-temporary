@@ -1,8 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module SiteURL where
 
-import AuthURL
-import ProfileURL
+import Happstack.Auth.Core.AuthURL
+import Happstack.Auth.Core.ProfileURL
 import Web.Routes
 import Web.Routes.TH
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances #-}
-module AuthURL where
+module Happstack.Auth.Core.AuthURL where
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad

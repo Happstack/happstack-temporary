@@ -3,11 +3,11 @@ module Pages.Profile where
 import Control.Applicative (Alternative(..))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import Profile
-import ProfileURL
 import Happstack.Server
 import Happstack.State
-import State.Auth
+import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.ProfileURL
+import Happstack.Auth.Core.Profile
 import Types
 import Web.Routes
 

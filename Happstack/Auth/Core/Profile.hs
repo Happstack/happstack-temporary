@@ -3,7 +3,7 @@
     UndecidableInstances, TypeOperators, RecordWildCards
     #-}
 
-module Profile where
+module Happstack.Auth.Core.Profile where
 
 import Control.Applicative 
 import Control.Monad.Reader
@@ -15,13 +15,27 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import State.Auth
+import Happstack.Auth.Core.Auth
 import Happstack.Data
 import Happstack.State
 import Happstack.Server
 import           Happstack.Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
 import qualified Happstack.Data.IxSet as IxSet
-import Types
+import Web.Routes
+
+newtype UserId = UserId { unUserId :: Integer }
+      deriving (Eq, Ord, Read, Show, Data, Typeable)
+instance Version UserId
+$(deriveSerialize ''UserId)
+$(deriveNewData [''UserId])
+
+instance PathInfo UserId where
+    toPathSegments (UserId i) = toPathSegments i
+    fromPathSegments = UserId <$> fromPathSegments
+
+succUserId :: UserId -> UserId
+succUserId (UserId i) = UserId (succ i)
+
 
 data Profile 
     = Profile

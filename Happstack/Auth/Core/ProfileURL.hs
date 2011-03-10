@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances #-}
-module ProfileURL where
+module Happstack.Auth.Core.ProfileURL where
 
 import Control.Applicative ((<$>))
 import Control.Monad
@@ -9,9 +9,10 @@ import Happstack.Server
 import Web.Routes.Happstack
 import Web.Routes.MTL
 import Web.Routes.XMLGenT
-import State.Auth
+import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.Profile
 import Test.QuickCheck
-import Types
+
 import Web.Routes
 data ProfileURL
     = P_SetPersonality UserId

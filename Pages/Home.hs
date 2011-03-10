@@ -1,12 +1,12 @@
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Pages.Home where
 
-import AuthURL
 import Happstack.Server
 import HSP
 import Pages.AppTemplate
 import SiteURL
-import Profile
+import Happstack.Auth.Core.AuthURL
+import Happstack.Auth.Core.Profile
 import Web.Routes
 import Types
 
