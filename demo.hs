@@ -16,11 +16,11 @@ import qualified HSX.XMLGenerator as HSX
 import Pages.Home
 import Pages.Login
 import Pages.Logout
-import Pages.Auth
-import Pages.Profile
 import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.AuthParts
 import Happstack.Auth.Core.AuthURL
 import Happstack.Auth.Core.Profile
+import Happstack.Auth.Core.ProfileParts
 import Happstack.Auth.Core.ProfileURL
 import SiteURL
 import Web.Routes

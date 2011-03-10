@@ -11,6 +11,7 @@ import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import Data.Time.Clock            (getCurrentTime)
 import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.AuthParts
 import Happstack.Auth.Core.AuthURL
 import Happstack.Auth.Core.ProfileURL
 import Happstack.Auth.Core.Profile
@@ -20,9 +21,7 @@ import Happstack.State            (query, update)
 import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT, XMLGenerator, genElement, unXMLGenT)
 import HSP.ServerPartT()
 import qualified HSX.XMLGenerator as HSX
-import Pages.Auth
 import Pages.AppTemplate
-import Pages.Profile
 import Pages.FormPart
 import Text.Digestive
 import Text.Digestive.Forms.Happstack ()
@@ -31,6 +30,7 @@ import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Routes                 (RouteT, ShowURL, showURL, showURLParams, URL)
 import Web.Routes.XMLGenT
+import Types ()
 
 -- * AuthURL stuff
 

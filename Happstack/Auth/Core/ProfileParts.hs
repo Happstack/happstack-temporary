@@ -1,4 +1,4 @@
-module Pages.Profile where
+module Happstack.Auth.Core.ProfileParts where
 
 import Control.Applicative (Alternative(..))
 import           Data.Set (Set)
@@ -8,7 +8,7 @@ import Happstack.State
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.ProfileURL
 import Happstack.Auth.Core.Profile
-import Types
+import Types ()
 import Web.Routes
 
 -- * ProfileURL stuff

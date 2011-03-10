@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-module Pages.Auth where
+module Happstack.Auth.Core.AuthParts where
 
 import Control.Applicative
 import Control.Monad.Trans
@@ -10,7 +10,6 @@ import Happstack.Server
 import Happstack.State
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.AuthURL
-import Types
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Routes
 
