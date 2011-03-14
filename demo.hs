@@ -14,20 +14,22 @@ import HSP
 import qualified HSX.XMLGenerator as HSX
 -- import Pages.AppTemplate
 import Pages.Home
-import Pages.Login
-import Pages.Logout
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.AuthParts
 import Happstack.Auth.Core.AuthURL
 import Happstack.Auth.Core.Profile
 import Happstack.Auth.Core.ProfileParts
 import Happstack.Auth.Core.ProfileURL
+import Happstack.Auth.HSP.Login
 import SiteURL
+import Types ()
 import Web.Routes
 import Web.Routes.Happstack          (implSite_)
+import Web.Routes.XMLGenT ()
 import Web.Routes.TH
 import Web.Routes.MTL
 
+defaultTemplate' :: (XMLGenerator m, EmbedAsChild m h, EmbedAsChild m b, HSX.XML m ~ XML) => String -> h -> b -> m Response
 defaultTemplate' t h b = liftM toResponse (defaultTemplate t h b)
 
 data DemoState = DemoState
@@ -99,49 +101,9 @@ handle realm url =
     case url of
       U_HomePage          -> homePage
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
-                                nestURL U_Auth $ handleAuth defaultTemplate' providerPage realm onAuthURL auth
+                                nestURL U_Auth $ handleAuth defaultTemplate' realm onAuthURL auth
       (U_Profile profile) -> nestURL U_Profile $ handleProfile defaultTemplate' profile
-{-
-handleAuth :: ( Happstack m
-              , XMLGenerator m
-              , EmbedAsChild m ()
-              , EmbedAsAttr m (Attr String AuthURL)
-              , ToMessage (HSX.XML m)
-              , Alternative m
-              , ShowURL m
-              , URL m ~ AuthURL
-              ) =>
-              (OpenIdProvider -> (OpenIdURL p) -> AuthMode -> n Response) --  -> ProviderPage n OpenIdProvider)
-           -> Maybe String 
-           -> String 
-           -> AuthURL 
-           -> m Response
--}
-handleAuth appTemplate providerPage realm onAuthURL url =
-    case url of
-      A_Login           -> appTemplate "Login"    () loginPage
-      A_AddAuth         -> appTemplate "Add Auth" () addAuthPage
-      A_Logout          -> appTemplate "Logout"   () logoutPage
-      (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId providerPage realm onAuthURL oidURL
+
 
 -- handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
-handleProfile appTemplate url =
-    case url of
-      P_PickProfile        -> 
-          do r <- pickProfile
-             case r of
-               (Picked {})                -> seeOther "/" (toResponse "/")
-               (PickPersonality profiles) -> 
-                   appTemplate "Pick Personality" () (personalityPicker profiles)
-               (PickAuthId      authIds)  -> 
-                   appTemplate "Pick Auth" () (authPicker authIds)
-                   
-                              
-      (P_SetAuthId authId) -> 
-          do b <- setAuthIdPage authId
-             if b
-              then seeOther "/" (toResponse "") -- FIXME: don't hardcode destination
-              else unauthorized =<< 
-                     appTemplate "unauthorized" ()
-                        <p>Attempted to set AuthId to <% show $ unAuthId authId %>, but failed because the Identifier is not associated with that AuthId.</p>
 

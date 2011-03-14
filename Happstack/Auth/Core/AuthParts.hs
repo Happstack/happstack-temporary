@@ -56,7 +56,7 @@ addAuthIdsCookie identifier =
        addAuthCookie authId (AuthIdentifier identifier)
        return authId
 
-connect :: (Happstack m, ShowURL m, URL m ~ (OpenIdURL p)) => 
+connect :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) => 
               AuthMode     -- ^ authentication mode
            -> Maybe String -- ^ realm
            -> String       -- ^ openid url
@@ -66,19 +66,16 @@ connect authMode realm url =
        gotoURL <- liftIO $ getForwardUrl url openIdUrl realm []
        seeOther gotoURL (toResponse gotoURL)
 
-type ProviderPage m p = (OpenIdURL p) -> AuthMode -> m Response
+-- type ProviderPage m p = (OpenIdURL p) -> AuthMode -> m Response
 
-handleOpenId :: (Alternative m, Happstack m, ShowURL m, URL m ~ (OpenIdURL p)) =>
-                 (p -> ProviderPage m p)
-             -> Maybe String -- ^ realm
-             -> String -- ^ onAuthURL
-             -> (OpenIdURL p) -- ^ this url
+handleOpenId :: (Alternative m, Happstack m, ShowURL m, URL m ~ OpenIdURL) =>
+                Maybe String -- ^ realm
+             -> String       -- ^ onAuthURL
+             -> OpenIdURL    -- ^ this url
              -> m Response
-handleOpenId providerPage realm onAuthURL url =
+handleOpenId realm onAuthURL url =
     case url of
       (O_OpenId authMode)                  -> openIdPage authMode onAuthURL
       (O_Connect authMode)                 -> 
           do url <- look "url"
              connect authMode realm url
-      (O_OpenIdProvider authMode provider) -> 
-          providerPage provider url authMode 

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
-module Pages.FormPart 
+module Happstack.Auth.HSP.FormPart 
     ( formPart
     ) where
 

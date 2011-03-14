@@ -75,19 +75,18 @@ data AuthURL
     | A_Local
     | A_CreateAccount
     | A_ChangePassword
-    | A_OpenId (OpenIdURL OpenIdProvider)
+    | A_OpenId OpenIdURL
+    | A_OpenIdProvider AuthMode OpenIdProvider
       deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-data OpenIdURL p
+data OpenIdURL
     = O_OpenId AuthMode
     | O_Connect AuthMode
-    | O_OpenIdProvider AuthMode p
       deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-instance (Arbitrary p) => Arbitrary (OpenIdURL p) where
+instance Arbitrary OpenIdURL where
     arbitrary = oneof [ O_OpenId <$> arbitrary
                       , O_Connect <$> arbitrary
-                      , O_OpenIdProvider <$> arbitrary <*> arbitrary
                       ]
 
 instance Arbitrary AuthURL where
@@ -98,12 +97,12 @@ instance Arbitrary AuthURL where
                       , return A_CreateAccount
                       , return A_ChangePassword
                       , A_OpenId <$> arbitrary
+                      , A_OpenIdProvider <$> arbitrary <*> arbitrary
                       ]
 
-instance (PathInfo p) => PathInfo (OpenIdURL p) where
+instance PathInfo OpenIdURL where
     toPathSegments (O_OpenId authMode)            = "openid_return" : toPathSegments authMode
     toPathSegments (O_Connect authMode)           = "connect" : toPathSegments authMode
-    toPathSegments (O_OpenIdProvider authMode provider) = "provider" : toPathSegments authMode ++ toPathSegments provider 
 
     fromPathSegments =
         msum [ do segment "openid_return"
@@ -112,10 +111,6 @@ instance (PathInfo p) => PathInfo (OpenIdURL p) where
              , do segment "connect"
                   authMode <- fromPathSegments
                   return (O_Connect authMode)
-             , do segment "provider"
-                  authMode <- fromPathSegments
-                  provider <- fromPathSegments
-                  return (O_OpenIdProvider authMode provider)
              ]
 
 instance PathInfo AuthURL where
@@ -126,6 +121,7 @@ instance PathInfo AuthURL where
     toPathSegments A_ChangePassword = ["change_password"]
     toPathSegments A_AddAuth        = ["add_auth"]
     toPathSegments (A_OpenId o) = "openid" : toPathSegments o
+    toPathSegments (A_OpenIdProvider authMode provider) = "provider" : toPathSegments authMode ++ toPathSegments provider 
 
     fromPathSegments =
         msum [ do segment "login"
@@ -142,6 +138,10 @@ instance PathInfo AuthURL where
                   A_OpenId <$> fromPathSegments
              , do segment "add_auth"
                   return A_AddAuth
+             , do segment "provider"
+                  authMode <- fromPathSegments
+                  provider <- fromPathSegments
+                  return (A_OpenIdProvider authMode provider)
              ]
 
 authUrlInverse :: Property
