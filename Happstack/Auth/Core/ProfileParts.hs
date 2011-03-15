@@ -16,7 +16,7 @@ import Web.Routes.Happstack
 
 -- can we pick an AuthId with only the information in the Auth stuff? Or should that be a profile action ?
 
-pickAuthId :: RouteT ProfileURL (ServerPartT IO) (Either (Set AuthId) AuthId)
+pickAuthId :: (Happstack m, Alternative m) => m (Either (Set AuthId) AuthId)
 pickAuthId =
     do (Just authToken) <- getAuthToken -- FIXME: Just 
        case tokenAuthId authToken of
@@ -49,7 +49,7 @@ data PickProfile
     | PickPersonality (Set Profile)
     | PickAuthId      (Set AuthId)
 
-pickProfile :: RouteT ProfileURL (ServerPartT IO) PickProfile
+pickProfile :: (Happstack m, Alternative m) => m PickProfile
 pickProfile =
     do eAid <- pickAuthId
        case eAid of

@@ -59,7 +59,7 @@ addAuthPage =
        <li><a href=(A_OpenIdProvider AddIdentifierMode Generic)    >Add</a> your OpenId Account</li>
       </ol>
 
-authPicker :: Set AuthId -> XMLGenT (RouteT ProfileURL (ServerPartT IO)) XML
+authPicker :: (XMLGenerator m, EmbedAsAttr m (Attr String ProfileURL)) => Set AuthId -> XMLGenT m (HSX.XML m)
 authPicker authIds =
     <div>
      <ul><% mapM auth (Set.toList authIds) %></ul>
@@ -68,7 +68,9 @@ authPicker authIds =
       auth authId =
           <li><a href=(P_SetAuthId authId)><% show authId %></a></li> -- FIXME: give a more informative view. 
 
-personalityPicker :: Set Profile -> XMLGenT (RouteT ProfileURL (ServerPartT IO)) XML
+personalityPicker :: (XMLGenerator m, EmbedAsChild m Text, EmbedAsAttr m (Attr String ProfileURL)) => 
+                     Set Profile 
+                  -> XMLGenT m (HSX.XML m)
 personalityPicker profiles =
     <div>
      <ul><% mapM personality (Set.toList profiles) %></ul>
@@ -159,20 +161,29 @@ handleAuth appTemplate realm onAuthURL url =
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId realm onAuthURL oidURL
       (A_OpenIdProvider authMode provider) ->  providerPage appTemplate provider url authMode
 
-
+handleProfile :: (Happstack m, Alternative m) =>
+                 (forall header body. ( EmbedAsChild (RouteT ProfileURL m) XML
+                                      , EmbedAsChild (RouteT ProfileURL m) header
+                                      , EmbedAsChild (RouteT ProfileURL m) body) => 
+                             (String  -> header -> body -> RouteT ProfileURL m Response))
+              -> ProfileURL 
+              -> RouteT ProfileURL m Response
 handleProfile appTemplate url =
     case url of
       P_PickProfile        -> 
           do r <- pickProfile
+             return undefined
              case r of
                (Picked {})                -> 
                    seeOther "/" (toResponse "/")
+
                (PickPersonality profiles) -> 
                    appTemplate "Pick Personality" () (personalityPicker profiles)
+
                (PickAuthId      authIds)  ->
                    appTemplate "Pick Auth" () (authPicker authIds) 
-                  
-                              
+
+
       (P_SetAuthId authId) -> 
           do b <- setAuthIdPage authId
              if b
