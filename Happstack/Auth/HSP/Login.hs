@@ -30,7 +30,6 @@ import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Routes                 (RouteT, ShowURL, showURL, showURLParams, nestURL, URL)
 import Web.Routes.XMLGenT
-import Types ()
 
 -- * AuthURL stuff
 logoutPage :: (XMLGenerator m, Alternative m, Happstack m, ShowURL m, URL m ~ AuthURL, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)

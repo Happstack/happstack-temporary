@@ -8,8 +8,9 @@ import Happstack.State
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.ProfileURL
 import Happstack.Auth.Core.Profile
-import Types ()
 import Web.Routes
+import Web.Routes.XMLGenT
+import Web.Routes.Happstack
 
 -- * ProfileURL stuff
 

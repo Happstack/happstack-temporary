@@ -9,7 +9,7 @@ import Test.QuickCheck
 import Web.Routes
 import Happstack.Server
 import Web.Routes.Happstack
-import Web.Routes.MTL
+import Web.Routes
 
 -- | move to Web.Routes.Happstack
 seeOtherURL :: (ShowURL m, FilterMonad Response m) => URL m -> m Response

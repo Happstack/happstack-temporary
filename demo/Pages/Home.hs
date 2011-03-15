@@ -8,7 +8,6 @@ import SiteURL
 import Happstack.Auth.Core.AuthURL
 import Happstack.Auth.Core.Profile
 import Web.Routes
-import Types
 
 homePage :: RouteT SiteURL (ServerPartT IO) Response
 homePage =

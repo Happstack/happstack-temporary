@@ -59,7 +59,6 @@ import Happstack.State
 import qualified Happstack.Data.IxSet as IxSet
 import           Happstack.Data.IxSet (IxSet, inferIxSet, noCalcs)
 import Happstack.Data.IxSet ((@=), getOne, updateIx)
-import System.Random              (randomRIO)
 import Web.Authenticate.OpenId
 import Web.Routes
 import Happstack.Server
@@ -357,7 +356,7 @@ authTokenAuthId tokenString =
 -- | generate an new authentication token
 genAuthToken :: (MonadIO m) => Maybe AuthId -> AuthMethod -> Int -> m AuthToken
 genAuthToken aid authMethod lifetime =
-    do random <- liftIO $ B.unpack <$> genSaltIO -- ^ the docs promise that the salt will be base64, so 'B.unpack' should be safe
+    do random <- liftIO $ B.unpack . exportSalt <$> genSaltIO -- ^ the docs promise that the salt will be base64, so 'B.unpack' should be safe
        now <- liftIO $ getCurrentTime
        let expires = addUTCTime (fromIntegral lifetime) now
            prefix = case aid of

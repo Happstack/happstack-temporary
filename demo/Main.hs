@@ -22,12 +22,10 @@ import Happstack.Auth.Core.ProfileParts
 import Happstack.Auth.Core.ProfileURL
 import Happstack.Auth.HSP.Login
 import SiteURL
-import Types ()
 import Web.Routes
 import Web.Routes.Happstack          (implSite_)
 import Web.Routes.XMLGenT ()
 import Web.Routes.TH
-import Web.Routes.MTL
 
 defaultTemplate' :: (XMLGenerator m, EmbedAsChild m h, EmbedAsChild m b, HSX.XML m ~ XML) => String -> h -> b -> m Response
 defaultTemplate' t h b = liftM toResponse (defaultTemplate t h b)
@@ -103,7 +101,3 @@ handle realm url =
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
                                 nestURL U_Auth $ handleAuth defaultTemplate' realm onAuthURL auth
       (U_Profile profile) -> nestURL U_Profile $ handleProfile defaultTemplate' profile
-
-
--- handleProfile :: ProfileURL -> RouteT ProfileURL (ServerPartT IO) Response
-
