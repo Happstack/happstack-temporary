@@ -115,15 +115,13 @@ $(mkMethods ''ProfileState
 
 getUserId :: (Alternative m, Happstack m) => m (Maybe UserId)
 getUserId =
-    do mTokenStr <- optional $ lookCookieValue "authToken"
-       case mTokenStr of
+    do mAuthToken <- getAuthToken 
+       case mAuthToken of
          Nothing -> return Nothing
-         (Just tokenStr) ->
-             do mAuthId <- query (AuthTokenAuthId tokenStr)
-                case mAuthId of
-                  Nothing -> return Nothing
-                  (Just authId) ->
-                      query (AuthIdUserId authId)
+         (Just authToken) ->
+             case tokenAuthId authToken of
+               Nothing -> return Nothing
+               (Just authId) -> query (AuthIdUserId authId)
 
 
 

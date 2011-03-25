@@ -15,6 +15,7 @@ module Happstack.Auth.Core.Auth
     , AuthMethod(..)
     , mkHashedPass
     , genAuthToken
+    , AskUserPass(..)
     , CheckUserPass(..)
     , CreateUserPass(..)
     , SetPassword(..)
@@ -278,6 +279,11 @@ checkUserPass username password =
                  do return (Right (upId userPass))
              | otherwise -> return (Left InvalidPassword)
 
+askUserPass :: UserPassId -> Query AuthState (Maybe UserPass)
+askUserPass uid = 
+    do as@(AuthState{..}) <-ask 
+       return $ getOne $ userPasses @= uid
+
 -- ** AuthMap
 
 addAuthMethod :: AuthMethod -> AuthId -> Update AuthState ()
@@ -379,7 +385,8 @@ genAuthId =
 askAuthState :: Query AuthState AuthState
 askAuthState = ask
 
-$(mkMethods ''AuthState [ 'checkUserPass
+$(mkMethods ''AuthState [ 'askUserPass
+                        , 'checkUserPass
                         , 'createUserPass
                         , 'setUserName
                         , 'setPassword

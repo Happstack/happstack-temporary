@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -F -pgmFtrhsx #-}
 module Happstack.Auth.HSP.Login where
 
-import Control.Applicative        (Alternative, (<*>), (<$>), (<*), optional)
+import Control.Applicative        (Alternative, (<*>), (<$>), (<*), (*>), optional)
 import Control.Monad              (replicateM, mplus)
 import Control.Monad.Trans        (MonadIO(liftIO))
 import Data.Maybe                 (mapMaybe)
@@ -175,6 +175,7 @@ handleAuth appTemplate realm onAuthURL url =
       A_Logout          -> appTemplate "Logout"   () logoutPage
       A_Local           -> localLoginPage appTemplate url onAuthURL
       A_CreateAccount   -> createAccountPage appTemplate onAuthURL url
+      A_ChangePassword  -> changePasswordPage appTemplate url
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId realm onAuthURL oidURL
       (A_OpenIdProvider authMode provider) 
                         -> providerPage appTemplate provider url authMode
@@ -314,19 +315,97 @@ newAccountForm =
                    (Right userPass) -> 
                        do authId <- update (NewAuthMethod (AuthUserPassId (upId userPass)))
                           return (Right (authId, upId userPass))
-      li :: a -> a
-      li = id
-             
-      ol :: a -> a
-      ol = id
 
-      fieldset :: a -> a
-      fieldset = id
 
-      notEmpty :: (Monad m) => Validator m String Text
-      notEmpty = (check "field can not be empty") (not . Text.null)
+li :: a -> a
+li = id
+       
+ol :: a -> a
+ol = id
 
---       minLengthString :: Int -> StoryForm String -> StoryForm String
-      minLengthString 0 f = f
-      minLengthString 1 f = errors ++> (f `validate` (check "This field can not be empty." (not . null)))
-      minLengthString n f = errors ++> (f `validate` (check ("This field must be at least " ++ show n ++ " characters.") (\t -> length t >= n)))
+fieldset :: a -> a
+fieldset = id
+
+notEmpty :: (Monad m) => Validator m String Text
+notEmpty = (check "field can not be empty") (not . Text.null)
+
+minLengthString 0 f = f
+minLengthString 1 f = errors ++> (f `validate` (check "This field can not be empty." (not . null)))
+minLengthString n f = errors ++> (f `validate` (check ("This field must be at least " ++ show n ++ " characters.") (\t -> length t >= n)))
+
+
+-- changePasswordPage :: StoryPromptsURL -> StoryPrompts Response
+changePasswordPage appTemplate here =
+    do actionURL <- showURL here
+       mAuthToken <- getAuthToken
+       case mAuthToken of
+         Nothing -> seeOtherURL A_Login
+         (Just authToken) ->
+             case tokenAuthMethod authToken of
+               (AuthUserPassId userPassId) ->
+                   do mUserPass <- query (AskUserPass userPassId)
+                      case mUserPass of
+                        Nothing ->
+                            internalServerError =<< appTemplate "Invalid UserPassId" () 
+                               <div id="main">
+                                 <p>Invalid UserPassId <% show $ unUserPassId userPassId %></p>
+                               </div>
+                        (Just userPass) ->
+                            ok =<< appTemplate "Change Password" () 
+                                      <div id="main">
+                                        <h1>Change Password for <% unUserName $ upName userPass %></h1>
+                                        <% formPart "p" actionURL (XMLGenT . handleSuccess (upId userPass)) (handleFailure appTemplate) (changePasswordForm userPass) %>
+                                      </div>
+                   
+               _ -> ok =<< appTemplate "Change Password Failure" ()
+                                 <div id="main">
+                                  <p>This account does not use a username and password.</p>
+                                 </div>
+    where
+      handleSuccess userPassId passwd =
+          do hashedPass <- liftIO $ mkHashedPass (Text.pack passwd)
+             r <- update (SetPassword userPassId hashedPass)
+             case r of
+               (Just e) -> 
+                   internalServerError =<< appTemplate "Internal Server Error" ()
+                                         <div id="main">
+                                          <p><% userPassErrorString e %></p>
+                                         </div>
+               Nothing ->
+                   ok =<< appTemplate "Password Updated" ()
+                    <div>
+                     <p>Your password has updated.</p>
+                    </div>
+
+changePasswordForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => UserPass -> Form v Input String [XMLGenT m (HSX.XML m)] String
+changePasswordForm userPass =
+    fieldset $ ol $ oldPassword *> newPassword <* changeBtn
+    where
+      -- form elements
+      oldPassword = 
+          errors ++>
+          (li $ label "old password: " ++> inputPassword `transform` checkAuth)
+
+      checkAuth =
+          transformEitherM $ \password ->
+              do r <- query (CheckUserPass (unUserName $ upName userPass) (Text.pack password))
+                 case r of 
+                   (Left e)  -> return (Left (userPassErrorString e))
+                   (Right _) -> return (Right password)
+
+
+      password1 = li $ label "new password: "         ++> inputPassword
+      password2 = li $ label "new confirm password: " ++> inputPassword
+
+--       newPassword :: StoryForm String
+      newPassword = 
+          errors ++> (minLengthString 6 $ 
+                      ((((,) <$> password1 <*> password2)) `transform` samePassword))
+
+      samePassword = 
+          transformEither $ \(p1, p2) ->
+              if p1 /= p2
+               then (Left "Passwords do not match.")
+               else (Right p1)
+
+      changeBtn = li $ submit "change"
