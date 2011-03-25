@@ -51,8 +51,8 @@ addAuthIdsCookie identifier =
     do authId <- 
            do authIds <- query (IdentifierAuthIds identifier)
               case Set.size authIds of
-                 1 -> return $ (Just $ head $ Set.toList $ authIds)
-                 n -> return $ Nothing
+                1 -> return $ (Just $ head $ Set.toList $ authIds)
+                n -> return $ Nothing
        addAuthCookie authId (AuthIdentifier identifier)
        return authId
 

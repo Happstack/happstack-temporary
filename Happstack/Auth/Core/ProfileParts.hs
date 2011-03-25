@@ -36,7 +36,7 @@ setAuthIdPage :: (Alternative m, Happstack m) => AuthId -> m Bool
 setAuthIdPage authId =
     do mAuthToken <- getAuthToken
        case mAuthToken of
-         Nothing -> undefined
+         Nothing -> undefined -- FIXME
          (Just authToken) ->
              do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
                 if Set.member authId authIds

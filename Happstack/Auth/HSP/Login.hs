@@ -9,6 +9,7 @@ import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
 import qualified Data.Set         as Set
 import Data.Text                  (Text)
+import qualified Data.Text        as Text
 import Data.Time.Clock            (getCurrentTime)
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.AuthParts
@@ -19,7 +20,7 @@ import Happstack.Auth.Core.ProfileParts
 import Happstack.Server           -- (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Input(..), Happstack, ServerPartT, addCookie, escape, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse, unauthorized)
 import Happstack.Server.HSP.HTML  (XML)
 import Happstack.State            (query, update)
-import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT(..), XMLGenerator, genElement, unXMLGenT)
+import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT(..), XMLGenerator, genElement, genEElement, unXMLGenT)
 import HSP.ServerPartT()
 import qualified HSX.XMLGenerator as HSX
 import Happstack.Auth.HSP.FormPart
@@ -31,8 +32,10 @@ import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Routes                 (RouteT, ShowURL, showURL, showURLParams, nestURL, URL)
 import Web.Routes.XMLGenT
 
+
+
 -- * AuthURL stuff
-logoutPage :: (XMLGenerator m, Alternative m, Happstack m, ShowURL m, URL m ~ AuthURL, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
+logoutPage :: (XMLGenerator m, Alternative m, Happstack m, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
 logoutPage =
     do deleteAuthCookie
        <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
@@ -46,6 +49,7 @@ loginPage =
        <li><a href=(A_OpenIdProvider LoginMode LiveJournal)>Login</a> with your Live Journal Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Myspace)    >Login</a> with your Myspace Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Generic)    >Login</a> with your OpenId Account</li>
+       <li><a href=A_Local                                 >Login</a> with a username and password.</li>
       </ol>
 
 
@@ -82,7 +86,9 @@ personalityPicker profiles =
 
 type PageTemplate x = String -> () -> (XMLGenT x (HSX.XML x)) -> XMLGenT x Response
 type PageTemplate' x = String -> () -> (XMLGenT x (HSX.XML x)) -> x Response
-
+{-
+providerPage :: (Happstack m, XMLGenerator m) => (forall body. (EmbedAsChild (RouteT AuthURL m) body) => (String -> () -> body -> XMLGenT (RouteT AuthURL m) Response)) -> OpenIdProvider -> AuthURL -> AuthMode -> RouteT AuthURL m Response
+-}
 providerPage appTemplate provider =
     case provider of
       Google      -> googlePage
@@ -143,7 +149,7 @@ liveJournalForm :: (Functor v, Monad v, XMLGenerator m) => Form v Input String [
 liveJournalForm = 
     label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* submit "Connect"
 
-
+{-
 handleAuth :: ( Happstack m
               , Alternative m
               , EmbedAsAttr (RouteT AuthURL m) (Attr String AuthURL)
@@ -153,36 +159,48 @@ handleAuth :: ( Happstack m
      -> String
      -> AuthURL
      -> RouteT AuthURL m Response
+-}
+
+handleAuth ::
+  (Happstack m, Alternative m) =>
+  (String  -> () -> XMLGenT (RouteT AuthURL m) XML -> RouteT AuthURL m Response)
+  -> Maybe String
+  -> String
+  -> AuthURL
+  -> RouteT AuthURL m Response
 handleAuth appTemplate realm onAuthURL url =
     case url of
       A_Login           -> appTemplate "Login"    () loginPage
       A_AddAuth         -> appTemplate "Add Auth" () addAuthPage
       A_Logout          -> appTemplate "Logout"   () logoutPage
+      A_Local           -> localLoginPage appTemplate url onAuthURL
+      A_CreateAccount   -> createAccountPage appTemplate onAuthURL url
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId realm onAuthURL oidURL
-      (A_OpenIdProvider authMode provider) ->  providerPage appTemplate provider url authMode
+      (A_OpenIdProvider authMode provider) 
+                        -> providerPage appTemplate provider url authMode
+
 
 handleProfile :: (Happstack m, Alternative m) =>
                  (forall header body. ( EmbedAsChild (RouteT ProfileURL m) XML
                                       , EmbedAsChild (RouteT ProfileURL m) header
                                       , EmbedAsChild (RouteT ProfileURL m) body) => 
                              (String  -> header -> body -> RouteT ProfileURL m Response))
+              -> String
               -> ProfileURL 
               -> RouteT ProfileURL m Response
-handleProfile appTemplate url =
+handleProfile appTemplate postPickedURL url =
     case url of
       P_PickProfile        -> 
           do r <- pickProfile
-             return undefined
              case r of
                (Picked {})                -> 
-                   seeOther "/" (toResponse "/")
+                   seeOther postPickedURL (toResponse postPickedURL)
 
                (PickPersonality profiles) -> 
                    appTemplate "Pick Personality" () (personalityPicker profiles)
 
                (PickAuthId      authIds)  ->
                    appTemplate "Pick Auth" () (authPicker authIds) 
-
 
       (P_SetAuthId authId) -> 
           do b <- setAuthIdPage authId
@@ -191,3 +209,124 @@ handleProfile appTemplate url =
               else unauthorized =<< 
                      appTemplate "unauthorized" ()
                         <p>Attempted to set AuthId to <% show $ unAuthId authId %>, but failed because the Identifier is not associated with that AuthId.</p>
+{-
+localLoginPage :: (Happstack m, Alternative m) =>
+                 (forall header body. ( EmbedAsChild (RouteT AuthURL m) XML
+                                      , EmbedAsChild (RouteT AuthURL m) header
+                                      , EmbedAsChild (RouteT AuthURL m) body) => 
+                             (String  -> header -> body -> RouteT AuthURL m Response))
+              -> AuthURL
+              -> String
+              -> RouteT AuthURL m Response
+-}
+localLoginPage appTemplate here onAuthURL =
+    do actionURL <- showURL here
+       appTemplate "Login" () $
+         <div id="main">
+           <h1>Login with a username and password</h1>
+           <% formPart "p" actionURL (XMLGenT . handleLogin) (handleFailure appTemplate) loginForm %>
+        </div>
+
+      where 
+        handleLogin :: (Happstack m) => UserPassId -> RouteT AuthURL m Response
+        handleLogin userPassId =
+            do authId <- do authIds <- query (UserPassIdAuthIds userPassId) 
+                            case Set.size authIds of
+                              1 -> return (Just $ head $ Set.toList $ authIds)
+                              n -> return Nothing
+               addAuthCookie authId (AuthUserPassId userPassId)
+               seeOther onAuthURL (toResponse ())
+
+        loginForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v Input String [XMLGenT m (HSX.XML m)] UserPassId
+        loginForm =
+            (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword) <* login) `transform` checkAuth))) <* create
+
+        create :: (Functor v, Monad v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v Input String [XMLGenT m (HSX.XML m)] ()
+        create = view [<p>or <a href=(A_CreateAccount)>create a new account</a></p>]
+
+        login :: (Functor v, Monad v, XMLGenerator m) => Form v Input String [XMLGenT m (HSX.XML m)] String
+        login = li $ (submit "Login") `setAttrs` [("class" := "submit")]
+
+        checkAuth :: (MonadIO m) => Transformer m String (Text, String) UserPassId
+        checkAuth = 
+            transformEitherM $ \(username, password) ->
+                do r <- query (CheckUserPass username (Text.pack password))
+                   case r of 
+                     (Left e) -> return (Left $ userPassErrorString e)
+                     (Right userPassId) -> return (Right userPassId)
+
+        li :: a -> a
+        li = id
+             
+        ol :: a -> a
+        ol = id
+
+        fieldset :: a -> a
+        fieldset = id
+
+
+
+-- createAccountPage :: StoryPromptsURL -> StoryPrompts Response
+createAccountPage appTemplate onAuthURL here =
+    do actionURL <- showURL here
+       ok =<< appTemplate "Create User Account" () 
+          <div id="main">
+           <h1>Create an account</h1>
+           <% formPart "p" actionURL handleSuccess (handleFailure appTemplate) newAccountForm %>
+          </div>
+    where
+      handleSuccess (authId, userPassId) =
+          do addAuthCookie (Just authId) (AuthUserPassId userPassId)
+             seeOther onAuthURL (toResponse ())
+
+newAccountForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v Input String [XMLGenT m (HSX.XML m)] (AuthId, UserPassId)
+newAccountForm =
+    fieldset (errors ++> (ol $ ((,) <$> username <*> password <* submitButton)
+                `transform`
+                createAccount))
+    where
+      br :: (XMLGenerator m, Monad v) => Form v Input String [XMLGenT m (HSX.XML m)] ()
+      br = view [<br />]
+      submitButton = li $ (submit "Create Account" `setAttrs` [("class" := "submit")])
+      username  = li $ ((label "username: "         ++> inputText Nothing)
+                   `validate` notEmpty) <++ errors
+      password1 = li $ label "password: "         ++> inputPassword
+      password2 = li $ label "confirm password: " ++> inputPassword
+--       password :: StoryForm String
+      password = 
+          errors ++> (minLengthString 6 $ 
+                      (((,) <$> password1 <*> password2) `transform` samePassword))
+
+      samePassword = 
+          transformEither $ \(p1, p2) ->
+              if p1 /= p2
+               then (Left "Passwords do not match.")
+               else (Right p1)
+
+--       createAccount :: (MonadIO m) => Transformer m String (Text, String) UserId
+      createAccount = 
+          transformEitherM $ \(username, password) ->
+              do passHash <- liftIO $ mkHashedPass (Text.pack password)
+                 r <- update $ CreateUserPass (UserName username) passHash
+                 -- fixme: race condition
+                 case r of
+                   (Left e) -> return (Left (userPassErrorString e))
+                   (Right userPass) -> 
+                       do authId <- update (NewAuthMethod (AuthUserPassId (upId userPass)))
+                          return (Right (authId, upId userPass))
+      li :: a -> a
+      li = id
+             
+      ol :: a -> a
+      ol = id
+
+      fieldset :: a -> a
+      fieldset = id
+
+      notEmpty :: (Monad m) => Validator m String Text
+      notEmpty = (check "field can not be empty") (not . Text.null)
+
+--       minLengthString :: Int -> StoryForm String -> StoryForm String
+      minLengthString 0 f = f
+      minLengthString 1 f = errors ++> (f `validate` (check "This field can not be empty." (not . null)))
+      minLengthString n f = errors ++> (f `validate` (check ("This field must be at least " ++ show n ++ " characters.") (\t -> length t >= n)))

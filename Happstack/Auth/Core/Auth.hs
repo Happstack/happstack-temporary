@@ -4,6 +4,7 @@
     #-}
 module Happstack.Auth.Core.Auth
     ( UserPass(..)
+    , UserPassId(..)
     , UserName(..)
     , UserPassError(..)
     , userPassErrorString
@@ -267,14 +268,14 @@ setPassword upid hashedPass =
     modifyUserPass upid $ \userPass ->
         userPass { upPassword = hashedPass }
 
-checkUserPass :: Text -> Text -> Query AuthState (Either UserPassError (Set AuthId))
+checkUserPass :: Text -> Text -> Query AuthState (Either UserPassError UserPassId)
 checkUserPass username password =
     do as@(AuthState{..}) <- ask
        case IxSet.getOne $ userPasses @= (UserName username) of
          Nothing -> return (Left $ InvalidUserName (UserName username))
          (Just userPass)
              | verifyHashedPass password (upPassword userPass) -> 
-                 do return (Right Set.empty)
+                 do return (Right (upId userPass))
              | otherwise -> return (Left InvalidPassword)
 
 -- ** AuthMap
