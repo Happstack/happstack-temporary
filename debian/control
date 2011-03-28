@@ -1,0 +1,99 @@
+Source: haskell-happstack-authenticate
+Priority: optional
+Section: misc
+Maintainer: Jeremy Shaw <jeremy@seereason.com>
+Build-Depends: debhelper (>= 7.0),
+               haskell-devscripts (>= 0.6.15+nmu7),
+               hscolour,
+               cdbs,
+               ghc6 (>= 6.8),
+               ghc6-prof,
+               libghc6-quickcheck-prof,
+               libghc6-authenticate-prof,
+               libghc6-digestive-functors-prof,
+               libghc6-digestive-functors-happstack-prof,
+               libghc6-digestive-functors-hsp-prof,
+               libghc6-happstack-data-prof (>= 6.0),
+               libghc6-happstack-data-prof (<< 6.1),
+               libghc6-happstack-hsp-prof,
+               libghc6-happstack-ixset-prof (>= 6.0),
+               libghc6-happstack-ixset-prof (<< 6.1),
+               libghc6-happstack-server-prof (>= 6.0),
+               libghc6-happstack-server-prof (<< 6.1),
+               libghc6-happstack-state-prof (>= 6.0),
+               libghc6-happstack-state-prof (<< 6.1),
+               libghc6-hsp-prof,
+               libghc6-hsx-prof,
+               libghc6-mtl-prof,
+               libghc6-pwstore-purehaskell-prof,
+               libghc6-text-prof,
+               libghc6-web-routes-prof,
+               libghc6-web-routes-happstack-prof,
+               libghc6-web-routes-hsp-prof
+Build-Depends-Indep: ghc6-doc,
+                     haddock,
+                     libghc6-quickcheck-doc,
+                     libghc6-authenticate-doc,
+                     libghc6-digestive-functors-doc,
+                     libghc6-digestive-functors-happstack-doc,
+                     libghc6-digestive-functors-hsp-doc,
+                     libghc6-happstack-data-doc (>= 6.0),
+                     libghc6-happstack-data-doc (<< 6.1),
+                     libghc6-happstack-hsp-doc,
+                     libghc6-happstack-ixset-doc (>= 6.0),
+                     libghc6-happstack-ixset-doc (<< 6.1),
+                     libghc6-happstack-server-doc (>= 6.0),
+                     libghc6-happstack-server-doc (<< 6.1),
+                     libghc6-happstack-state-doc (>= 6.0),
+                     libghc6-happstack-state-doc (<< 6.1),
+                     libghc6-hsp-doc,
+                     libghc6-hsx-doc,
+                     libghc6-mtl-doc,
+                     libghc6-pwstore-purehaskell-doc,
+                     libghc6-text-doc,
+                     libghc6-web-routes-doc,
+                     libghc6-web-routes-happstack-doc,
+                     libghc6-web-routes-hsp-doc
+Standards-Version: 3.8.1
+Homepage: http://src.seereason.com/happstack-authenticate
+
+Package: libghc6-happstack-authenticate-dev
+Architecture: any
+Section: haskell
+Depends: ${haskell:Depends},
+         ${misc:Depends}
+Description: Happstack Authentication Library
+ A themeable authentication library with support for username+password and OpenId.
+ .
+  Author: Jeremy Shaw
+  Upstream-Maintainer: jeremy@seereason.com
+ .
+ This package contains the normal library files.
+
+Package: libghc6-happstack-authenticate-prof
+Architecture: any
+Section: haskell
+Depends: ${haskell:Depends},
+         ${misc:Depends},
+         libghc6-happstack-authenticate-dev
+Description: Happstack Authentication Library
+ A themeable authentication library with support for username+password and OpenId.
+ .
+  Author: Jeremy Shaw
+  Upstream-Maintainer: jeremy@seereason.com
+ .
+ This package contains the libraries compiled with profiling enabled.
+
+Package: libghc6-happstack-authenticate-doc
+Architecture: all
+Section: doc
+Depends: ${haskell:Depends},
+         ${misc:Depends},
+         ghc6-doc
+Description: Happstack Authentication Library
+ A themeable authentication library with support for username+password and OpenId.
+ .
+  Author: Jeremy Shaw
+  Upstream-Maintainer: jeremy@seereason.com
+ .
+ This package contains the documentation files.
