@@ -40,7 +40,7 @@ Library
                        hsx,
                        mtl,
                        pwstore-purehaskell,
-                       QuickCheck,
+                       QuickCheck >= 2,
                        text,
                        time,
                        web-routes,
