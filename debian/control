@@ -2,7 +2,8 @@ Source: haskell-happstack-authenticate
 Priority: optional
 Section: misc
 Maintainer: Jeremy Shaw <jeremy@seereason.com>
-Build-Depends: debhelper (>= 7.0),
+Build-Depends: trhsx,
+               debhelper (>= 7.0),
                haskell-devscripts (>= 0.6.15+nmu7),
                hscolour,
                cdbs,
