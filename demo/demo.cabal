@@ -1,0 +1,41 @@
+Name: demo
+Version: 1.0.0
+License: BSD3
+Copyright: (c) 2011 SeeReason Partners LLC
+Author: Jeremy Shaw <jeremy@seereason.com>
+Stability: Experimental
+Category: Web
+Synopsis: A demo of the happstack-authenticate library
+Description:
+ happstack-authenticate supports user account authentication using OpenId or plain old username + password.
+Cabal-version: >= 1.8
+Build-type: Custom
+
+Flag base4
+    Description: Choose the even newer, even smaller, split-up base package.
+
+Executable demo-server
+ Main-Is: Main.hs
+
+ GHC-Options: -threaded -Wall -Wwarn -O2 -rtsopts -fno-warn-name-shadowing -fno-warn-missing-signatures -fwarn-tabs -fno-warn-unused-binds -fno-warn-orphans -fwarn-unused-imports -fno-spec-constr
+ Build-depends: happstack-authenticate,
+                happstack-data,
+                happstack-hsp,
+                happstack-ixset, 
+                happstack-state, 
+                happstack-server, 
+                hsx, 
+                hsp, 
+                mtl, 
+                text >= 0.11, 
+                web-routes, 
+                web-routes-happstack, 
+                web-routes-hsp, 
+                web-routes-th
+ if !os(windows)
+   -- Cabal has a bug on windows and cannot find trhsx
+   Build-Tools: trhsx
+
+ if flag(base4)
+    Build-Depends: base >= 4 && < 5, syb
+
