@@ -21,7 +21,9 @@ import Happstack.Auth.Core.Profile
 import Happstack.Auth.Core.ProfileParts
 import Happstack.Auth.Core.ProfileURL
 import Happstack.Auth.HSP.Login
+import ProfileData
 import SiteURL
+import System.Environment
 import Web.Routes
 import Web.Routes.Happstack          (implSite_)
 import Web.Routes.XMLGenT ()
@@ -36,15 +38,16 @@ $(deriveSerialize ''DemoState)
 instance Version DemoState
 
 instance Component DemoState where
-    type Dependencies DemoState = AuthState :+: ProfileState :+: End
+    type Dependencies DemoState = AuthState :+: ProfileState :+: ProfileDataState :+: End
     initialValue = DemoState
 
 $(mkMethods ''DemoState [])
 
 main :: IO ()
 main = 
-    do state <- startSystemState (Proxy :: Proxy DemoState)
-       tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl "http://www.n-heptane.com:8000/")
+    do [baseURI] <- getArgs
+       state <- startSystemState (Proxy :: Proxy DemoState)
+       tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl baseURI)
        putStrLn "started."
        waitForTermination
        killThread tid
@@ -77,7 +80,7 @@ impl baseURI = do
     decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
     rq <- askRq
     liftIO $ print rq
-    msum [ do r <- implSite_ baseURI "web/" (spec (Just "http://*.n-heptane.com:8000/"))
+    msum [ do r <- implSite_ baseURI "web/" (spec (Just baseURI))
               case r of
                 (Left e) -> liftIO (print e) >> mzero
                 (Right r) -> return r
@@ -94,10 +97,14 @@ spec realm =
            , parsePathSegments   = parseSegments fromPathSegments
            }
 
+-- TODO: use urlTemplate
 handle :: Maybe String -> SiteURL -> RouteT SiteURL (ServerPartT IO) Response
 handle realm url =
     case url of
       U_HomePage          -> homePage
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
                                 nestURL U_Auth $ handleAuth defaultTemplate' realm onAuthURL auth
-      (U_Profile profile) -> nestURL U_Profile $ handleProfile defaultTemplate' profile
+      (U_Profile profile) -> do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
+                                nestURL U_Profile $ handleProfile defaultTemplate' postPickedURL profile
+      (U_ProfileData profileDataURL) ->
+                             do handleProfileData profileDataURL
