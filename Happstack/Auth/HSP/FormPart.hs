@@ -15,6 +15,7 @@ import Happstack.Server.HSX () -- instance (ServerMonad XMLGenT)
 import qualified HSX.XMLGenerator as HSX
 import Text.Digestive
 import Text.Digestive.HSP.Html4
+import Text.Digestive.Forms.Happstack
 
 -- ^ turn a formlet into XML+ServerPartT which can be embedded in a larger document
 
@@ -25,7 +26,7 @@ formPart ::
     -> String             -- ^ url to POST form results to
   -> (a -> XMLGenT m b) -- ^ handler used when form validates
   -> ([(FormRange, e)] -> [XMLGenT m (HSX.XML m)] -> XMLGenT m b) -- ^ handler used when form does not validate
-  -> Form (XMLGenT m) Input e xml a      -- ^ the formlet
+  -> Form (XMLGenT m) [Input] e xml a      -- ^ the formlet
   -> XMLGenT m (HSX.XML m)
 formPart prefix action handleSuccess handleFailure form =
     msum [ do methodM [GET, HEAD]
@@ -35,7 +36,7 @@ formPart prefix action handleSuccess handleFailure form =
                </form>
          , do methodM POST
               mapXMLGenT (escape . fmap toResponse) $
-                       do (v,r) <- runForm form prefix $ Environment (\i -> XMLGenT $ optional $ lookInput (showFormId i))
+                       do (v,r) <- runForm form prefix $ happstackEnvironment
                           case r of
                             (Ok a)    -> handleSuccess a
                             (Error e) ->

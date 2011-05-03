@@ -145,7 +145,7 @@ handleFailure appTemplate errs formXML =
                 <% formXML %>
                </div>
 
-liveJournalForm :: (Functor v, Monad v, XMLGenerator m) => Form v Input String [XMLGenT m (HSX.XML m)] String
+liveJournalForm :: (Functor v, Monad v, XMLGenerator m) => Form v [Input] String [XMLGenT m (HSX.XML m)] String
 liveJournalForm = 
     label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* submit "Connect"
 
@@ -238,14 +238,14 @@ localLoginPage appTemplate here onAuthURL =
                addAuthCookie authId (AuthUserPassId userPassId)
                seeOther onAuthURL (toResponse ())
 
-        loginForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v Input String [XMLGenT m (HSX.XML m)] UserPassId
+        loginForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] UserPassId
         loginForm =
             (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword) <* login) `transform` checkAuth))) <* create
 
-        create :: (Functor v, Monad v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v Input String [XMLGenT m (HSX.XML m)] ()
+        create :: (Functor v, Monad v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] ()
         create = view [<p>or <a href=(A_CreateAccount)>create a new account</a></p>]
 
-        login :: (Functor v, Monad v, XMLGenerator m) => Form v Input String [XMLGenT m (HSX.XML m)] String
+        login :: (Functor v, Monad v, XMLGenerator m) => Form v [Input] String [XMLGenT m (HSX.XML m)] String
         login = li $ (submit "Login") `setAttrs` [("class" := "submit")]
 
         checkAuth :: (MonadIO m) => Transformer m String (Text, String) UserPassId
@@ -280,13 +280,13 @@ createAccountPage appTemplate onAuthURL here =
           do addAuthCookie (Just authId) (AuthUserPassId userPassId)
              seeOther onAuthURL (toResponse ())
 
-newAccountForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v Input String [XMLGenT m (HSX.XML m)] (AuthId, UserPassId)
+newAccountForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] (AuthId, UserPassId)
 newAccountForm =
     fieldset (errors ++> (ol $ ((,) <$> username <*> password <* submitButton)
                 `transform`
                 createAccount))
     where
-      br :: (XMLGenerator m, Monad v) => Form v Input String [XMLGenT m (HSX.XML m)] ()
+      br :: (XMLGenerator m, Monad v) => Form v [Input] String [XMLGenT m (HSX.XML m)] ()
       br = view [<br />]
       submitButton = li $ (submit "Create Account" `setAttrs` [("class" := "submit")])
       username  = li $ ((label "username: "         ++> inputText Nothing)
@@ -377,7 +377,7 @@ changePasswordPage appTemplate here =
                      <p>Your password has updated.</p>
                     </div>
 
-changePasswordForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => UserPass -> Form v Input String [XMLGenT m (HSX.XML m)] String
+changePasswordForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => UserPass -> Form v [Input] String [XMLGenT m (HSX.XML m)] String
 changePasswordForm userPass =
     fieldset $ ol $ oldPassword *> newPassword <* changeBtn
     where
