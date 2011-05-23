@@ -44,7 +44,7 @@ logoutPage =
 loginPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
 loginPage =
       <ol>
-       <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google</li>
+       <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Yahoo)      >Login</a> with your Yahoo Account</li>
        <li><a href=(A_OpenIdProvider LoginMode LiveJournal)>Login</a> with your Live Journal Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Myspace)    >Login</a> with your Myspace Account</li>

@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.2.1) unstable; urgency=low
+
+  * typo: Login with your Google *Account*
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Sun, 22 May 2011 20:47:42 -0500
+
 haskell-happstack-authenticate (0.2) unstable; urgency=low
 
   * Updated to use new digestive-functors >= 0.1 and friends
