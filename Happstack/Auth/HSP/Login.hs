@@ -5,6 +5,7 @@ module Happstack.Auth.HSP.Login where
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), (*>), optional)
 import Control.Monad              (replicateM, mplus)
 import Control.Monad.Trans        (MonadIO(liftIO))
+import Data.Acid                  (AcidState, query', update')
 import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
 import qualified Data.Set         as Set
@@ -19,7 +20,6 @@ import Happstack.Auth.Core.Profile
 import Happstack.Auth.Core.ProfileParts
 import Happstack.Server           -- (CookieLife(Session), Response, ServerMonad(..), FilterMonad(..), Input(..), Happstack, ServerPartT, addCookie, escape, internalServerError, lookCookieValue, lookPairs, mkCookie, seeOther, toResponse, unauthorized)
 import Happstack.Server.HSP.HTML  (XML)
-import Happstack.State            (query, update)
 import HSP                        (Attr(..), EmbedAsAttr(..), EmbedAsChild(..), XMLGenT(..), XMLGenerator, genElement, genEElement, unXMLGenT)
 import HSP.ServerPartT()
 import qualified HSX.XMLGenerator as HSX
@@ -35,9 +35,9 @@ import Web.Routes.XMLGenT
 
 
 -- * AuthURL stuff
-logoutPage :: (XMLGenerator m, Alternative m, Happstack m, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
-logoutPage =
-    do deleteAuthCookie
+logoutPage :: (XMLGenerator m, Alternative m, Happstack m, EmbedAsAttr m (Attr String AuthURL)) => AcidState AuthState -> XMLGenT m (HSX.XML m)
+logoutPage authStateH =
+    do deleteAuthCookie authStateH 
        <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
 
 
@@ -94,6 +94,7 @@ providerPage appTemplate provider =
       Google      -> googlePage
       Yahoo       -> yahooPage
       LiveJournal -> liveJournalPage appTemplate
+      -- FIXME
 
 googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
               AuthURL
@@ -163,36 +164,39 @@ handleAuth :: ( Happstack m
 
 handleAuth ::
   (Happstack m, Alternative m) =>
-  (String  -> () -> XMLGenT (RouteT AuthURL m) XML -> RouteT AuthURL m Response)
+     AcidState AuthState 
+  -> (String  -> () -> XMLGenT (RouteT AuthURL m) XML -> RouteT AuthURL m Response)
   -> Maybe String
   -> String
   -> AuthURL
   -> RouteT AuthURL m Response
-handleAuth appTemplate realm onAuthURL url =
+handleAuth authStateH appTemplate realm onAuthURL url =
     case url of
       A_Login           -> appTemplate "Login"    () loginPage
       A_AddAuth         -> appTemplate "Add Auth" () addAuthPage
-      A_Logout          -> appTemplate "Logout"   () logoutPage
-      A_Local           -> localLoginPage appTemplate url onAuthURL
-      A_CreateAccount   -> createAccountPage appTemplate onAuthURL url
-      A_ChangePassword  -> changePasswordPage appTemplate url
-      (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId realm onAuthURL oidURL
+      A_Logout          -> appTemplate "Logout"   () (logoutPage authStateH)
+      A_Local           -> localLoginPage authStateH appTemplate url onAuthURL
+      A_CreateAccount   -> createAccountPage authStateH appTemplate onAuthURL url
+      A_ChangePassword  -> changePasswordPage authStateH appTemplate url
+      (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId authStateH realm onAuthURL oidURL
       (A_OpenIdProvider authMode provider) 
                         -> providerPage appTemplate provider url authMode
 
 
 handleProfile :: (Happstack m, Alternative m) =>
-                 (forall header body. ( EmbedAsChild (RouteT ProfileURL m) XML
+                 AcidState AuthState
+              -> AcidState ProfileState
+              -> (forall header body. ( EmbedAsChild (RouteT ProfileURL m) XML
                                       , EmbedAsChild (RouteT ProfileURL m) header
                                       , EmbedAsChild (RouteT ProfileURL m) body) => 
                              (String  -> header -> body -> RouteT ProfileURL m Response))
               -> String
               -> ProfileURL 
               -> RouteT ProfileURL m Response
-handleProfile appTemplate postPickedURL url =
+handleProfile authStateH profileStateH appTemplate postPickedURL url =
     case url of
       P_PickProfile        -> 
-          do r <- pickProfile
+          do r <- pickProfile authStateH profileStateH
              case r of
                (Picked {})                -> 
                    seeOther postPickedURL (toResponse postPickedURL)
@@ -204,7 +208,7 @@ handleProfile appTemplate postPickedURL url =
                    appTemplate "Pick Auth" () (authPicker authIds) 
 
       (P_SetAuthId authId) -> 
-          do b <- setAuthIdPage authId
+          do b <- setAuthIdPage authStateH authId
              if b
               then seeOther "/" (toResponse "") -- FIXME: don't hardcode destination
               else unauthorized =<< 
@@ -220,7 +224,7 @@ localLoginPage :: (Happstack m, Alternative m) =>
               -> String
               -> RouteT AuthURL m Response
 -}
-localLoginPage appTemplate here onAuthURL =
+localLoginPage authStateH appTemplate here onAuthURL =
     do actionURL <- showURL here
        appTemplate "Login" () $
          <div id="main">
@@ -231,11 +235,11 @@ localLoginPage appTemplate here onAuthURL =
       where 
         handleLogin :: (Happstack m) => UserPassId -> RouteT AuthURL m Response
         handleLogin userPassId =
-            do authId <- do authIds <- query (UserPassIdAuthIds userPassId) 
+            do authId <- do authIds <- query' authStateH (UserPassIdAuthIds userPassId) 
                             case Set.size authIds of
                               1 -> return (Just $ head $ Set.toList $ authIds)
                               n -> return Nothing
-               addAuthCookie authId (AuthUserPassId userPassId)
+               addAuthCookie authStateH authId (AuthUserPassId userPassId)
                seeOther onAuthURL (toResponse ())
 
         loginForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] UserPassId
@@ -251,7 +255,7 @@ localLoginPage appTemplate here onAuthURL =
         checkAuth :: (MonadIO m) => Transformer m String (Text, String) UserPassId
         checkAuth = 
             transformEitherM $ \(username, password) ->
-                do r <- query (CheckUserPass username (Text.pack password))
+                do r <- query' authStateH (CheckUserPass username (Text.pack password))
                    case r of 
                      (Left e) -> return (Left $ userPassErrorString e)
                      (Right userPassId) -> return (Right userPassId)
@@ -268,20 +272,20 @@ localLoginPage appTemplate here onAuthURL =
 
 
 -- createAccountPage :: StoryPromptsURL -> StoryPrompts Response
-createAccountPage appTemplate onAuthURL here =
+createAccountPage authStateH appTemplate onAuthURL here =
     do actionURL <- showURL here
        ok =<< appTemplate "Create User Account" () 
           <div id="main">
            <h1>Create an account</h1>
-           <% formPart "p" actionURL handleSuccess (handleFailure appTemplate) newAccountForm %>
+           <% formPart "p" actionURL handleSuccess (handleFailure appTemplate) (newAccountForm authStateH) %>
           </div>
     where
       handleSuccess (authId, userPassId) =
-          do addAuthCookie (Just authId) (AuthUserPassId userPassId)
+          do addAuthCookie authStateH (Just authId) (AuthUserPassId userPassId)
              seeOther onAuthURL (toResponse ())
 
-newAccountForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] (AuthId, UserPassId)
-newAccountForm =
+newAccountForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => AcidState AuthState -> Form v [Input] String [XMLGenT m (HSX.XML m)] (AuthId, UserPassId)
+newAccountForm authStateH =
     fieldset (errors ++> (ol $ ((,) <$> username <*> password <* submitButton)
                 `transform`
                 createAccount))
@@ -308,12 +312,12 @@ newAccountForm =
       createAccount = 
           transformEitherM $ \(username, password) ->
               do passHash <- liftIO $ mkHashedPass (Text.pack password)
-                 r <- update $ CreateUserPass (UserName username) passHash
+                 r <- update' authStateH $ CreateUserPass (UserName username) passHash
                  -- fixme: race condition
                  case r of
                    (Left e) -> return (Left (userPassErrorString e))
                    (Right userPass) -> 
-                       do authId <- update (NewAuthMethod (AuthUserPassId (upId userPass)))
+                       do authId <- update' authStateH (NewAuthMethod (AuthUserPassId (upId userPass)))
                           return (Right (authId, upId userPass))
 
 
@@ -335,15 +339,15 @@ minLengthString n f = errors ++> (f `validate` (check ("This field must be at le
 
 
 -- changePasswordPage :: StoryPromptsURL -> StoryPrompts Response
-changePasswordPage appTemplate here =
+changePasswordPage authStateH appTemplate here =
     do actionURL <- showURL here
-       mAuthToken <- getAuthToken
+       mAuthToken <- getAuthToken authStateH
        case mAuthToken of
          Nothing -> seeOtherURL A_Login
          (Just authToken) ->
              case tokenAuthMethod authToken of
                (AuthUserPassId userPassId) ->
-                   do mUserPass <- query (AskUserPass userPassId)
+                   do mUserPass <- query' authStateH (AskUserPass userPassId)
                       case mUserPass of
                         Nothing ->
                             internalServerError =<< appTemplate "Invalid UserPassId" () 
@@ -354,7 +358,7 @@ changePasswordPage appTemplate here =
                             ok =<< appTemplate "Change Password" () 
                                       <div id="main">
                                         <h1>Change Password for <% unUserName $ upName userPass %></h1>
-                                        <% formPart "p" actionURL (XMLGenT . handleSuccess (upId userPass)) (handleFailure appTemplate) (changePasswordForm userPass) %>
+                                        <% formPart "p" actionURL (XMLGenT . handleSuccess (upId userPass)) (handleFailure appTemplate) (changePasswordForm authStateH userPass) %>
                                       </div>
                    
                _ -> ok =<< appTemplate "Change Password Failure" ()
@@ -364,7 +368,7 @@ changePasswordPage appTemplate here =
     where
       handleSuccess userPassId passwd =
           do hashedPass <- liftIO $ mkHashedPass (Text.pack passwd)
-             r <- update (SetPassword userPassId hashedPass)
+             r <- update' authStateH (SetPassword userPassId hashedPass)
              case r of
                (Just e) -> 
                    internalServerError =<< appTemplate "Internal Server Error" ()
@@ -377,8 +381,8 @@ changePasswordPage appTemplate here =
                      <p>Your password has updated.</p>
                     </div>
 
-changePasswordForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => UserPass -> Form v [Input] String [XMLGenT m (HSX.XML m)] String
-changePasswordForm userPass =
+changePasswordForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => AcidState AuthState -> UserPass -> Form v [Input] String [XMLGenT m (HSX.XML m)] String
+changePasswordForm authStateH userPass =
     fieldset $ ol $ oldPassword *> newPassword <* changeBtn
     where
       -- form elements
@@ -388,7 +392,7 @@ changePasswordForm userPass =
 
       checkAuth =
           transformEitherM $ \password ->
-              do r <- query (CheckUserPass (unUserName $ upName userPass) (Text.pack password))
+              do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) (Text.pack password))
                  case r of 
                    (Left e)  -> return (Left (userPassErrorString e))
                    (Right _) -> return (Right password)

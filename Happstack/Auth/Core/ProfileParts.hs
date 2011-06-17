@@ -1,10 +1,10 @@
 module Happstack.Auth.Core.ProfileParts where
 
 import Control.Applicative (Alternative(..))
-import           Data.Set (Set)
-import qualified Data.Set as Set
+import           Data.Acid (AcidState, update', query')
+import           Data.Set  (Set)
+import qualified Data.Set  as Set
 import Happstack.Server
-import Happstack.State
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.ProfileURL
 import Happstack.Auth.Core.Profile
@@ -16,31 +16,31 @@ import Web.Routes.Happstack
 
 -- can we pick an AuthId with only the information in the Auth stuff? Or should that be a profile action ?
 
-pickAuthId :: (Happstack m, Alternative m) => m (Either (Set AuthId) AuthId)
-pickAuthId =
-    do (Just authToken) <- getAuthToken -- FIXME: Just 
+pickAuthId :: (Happstack m, Alternative m) => AcidState AuthState -> m (Either (Set AuthId) AuthId)
+pickAuthId authStateH =
+    do (Just authToken) <- getAuthToken authStateH -- FIXME: Just 
        case tokenAuthId authToken of
          (Just authId) -> return (Right authId)
          Nothing ->
-             do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
+             do authIds <- query' authStateH (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
                 case Set.size authIds of
-                  0 -> do authId <- update (NewAuthMethod (tokenAuthMethod authToken))
-                          update (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
+                  0 -> do authId <- update' authStateH (NewAuthMethod (tokenAuthMethod authToken))
+                          update' authStateH (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
                           return (Right authId)
                   1 -> do let aid = head $ Set.toList authIds
-                          update (UpdateAuthToken (authToken { tokenAuthId = Just aid }))
+                          update' authStateH (UpdateAuthToken (authToken { tokenAuthId = Just aid }))
                           return (Right aid)
                   n -> return (Left authIds)
 
-setAuthIdPage :: (Alternative m, Happstack m) => AuthId -> m Bool
-setAuthIdPage authId =
-    do mAuthToken <- getAuthToken
+setAuthIdPage :: (Alternative m, Happstack m) => AcidState AuthState -> AuthId -> m Bool
+setAuthIdPage authStateH authId =
+    do mAuthToken <- getAuthToken authStateH
        case mAuthToken of
          Nothing -> undefined -- FIXME
          (Just authToken) ->
-             do authIds <- query (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
+             do authIds <- query' authStateH (IdentifierAuthIds (amIdentifier $ tokenAuthMethod authToken)) -- FIXME: might not be an Identifier
                 if Set.member authId authIds
-                   then do update (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
+                   then do update' authStateH (UpdateAuthToken (authToken { tokenAuthId = Just authId }))
                            return True
                    else return False
 
@@ -49,22 +49,22 @@ data PickProfile
     | PickPersonality (Set Profile)
     | PickAuthId      (Set AuthId)
 
-pickProfile :: (Happstack m, Alternative m) => m PickProfile
-pickProfile =
-    do eAid <- pickAuthId
+pickProfile :: (Happstack m, Alternative m) => AcidState AuthState -> AcidState ProfileState -> m PickProfile
+pickProfile authStateH profileStateH =
+    do eAid <- pickAuthId authStateH
        case eAid of
          (Right aid) ->
-             do mUid <- query (AuthIdUserId aid)
+             do mUid <- query' profileStateH (AuthIdUserId aid)
                 case mUid of
                   Nothing ->
-                      do profiles <- query (AuthIdProfiles aid)
+                      do profiles <- query' profileStateH (AuthIdProfiles aid)
                          case Set.size profiles of
-                           0 -> do uid <- update (CreateNewProfile (Set.singleton aid))
-                                   update (SetAuthIdUserId aid uid)
+                           0 -> do uid <- update' profileStateH (CreateNewProfile (Set.singleton aid))
+                                   update' profileStateH (SetAuthIdUserId aid uid)
                                    return (Picked uid)
 --                                   seeOther onLoginURL (toResponse onLoginURL)
                            1 -> do let profile = head $ Set.toList profiles
-                                   update (SetAuthIdUserId aid (userId profile))
+                                   update' profileStateH (SetAuthIdUserId aid (userId profile))
                                    return (Picked (userId profile))
                            n -> do return (PickPersonality profiles)
                   (Just uid) ->

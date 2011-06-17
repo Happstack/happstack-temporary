@@ -10,6 +10,7 @@ module Happstack.Auth.Core.Auth
     , userPassErrorString
     , SetUserName(..)
     , AuthState(..)
+    , initialAuthState
     , AuthToken(..)
     , AuthId(..)
     , AuthMethod(..)
@@ -45,19 +46,19 @@ import Control.Monad.Reader (ask)
 import Control.Monad.State  (get, put)
 import Control.Monad.Trans  (MonadIO(..))
 import Crypto.PasswordStore
+import Data.Acid
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
-import Data.Data (Data)
+import Data.Data (Data, Typeable)
 import Data.Map (Map)
 import qualified Data.Map   as Map
+import Data.SafeCopy -- (base, deriveSafeCopy)
 import           Data.Set   (Set)
 import qualified Data.Set   as Set
 import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime,)
 import qualified Data.Text  as Text
 import qualified Data.Text.Encoding  as Text
 import           Data.Text  (Text)
-import Happstack.Data
-import Happstack.State
 import qualified Happstack.Data.IxSet as IxSet
 import           Happstack.Data.IxSet (IxSet, inferIxSet, noCalcs)
 import Happstack.Data.IxSet ((@=), getOne, updateIx)
@@ -65,11 +66,17 @@ import Web.Authenticate.OpenId
 import Web.Routes
 import Happstack.Server
 
+instance (SafeCopy a, Ord a, Typeable a, IxSet.Indexable a) => SafeCopy (IxSet a) where
+    putCopy ixSet = contain $ safePut (IxSet.toList ixSet)
+    getCopy = contain $ IxSet.fromList <$> safeGet
+
+
 newtype AuthId = AuthId { unAuthId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version AuthId
-$(deriveSerialize ''AuthId)
-$(deriveNewData [''AuthId])
+$(deriveSafeCopy 1 'base ''AuthId)
+-- instance Version AuthId
+-- $(deriveSerialize ''AuthId)
+-- $(deriveNewData [''AuthId])
 
 instance PathInfo AuthId where
     toPathSegments (AuthId i) = toPathSegments i
@@ -82,19 +89,22 @@ succAuthId (AuthId i) = AuthId (succ i)
 
 newtype HashedPass = HashedPass ByteString
     deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version HashedPass
-$(deriveSerialize ''HashedPass)
+$(deriveSafeCopy 1 'base ''HashedPass)
+-- instance Version HashedPass
+-- $(deriveSerialize ''HashedPass)
 
 newtype UserName = UserName { unUserName :: Text }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version UserName
-$(deriveSerialize ''UserName)
+$(deriveSafeCopy 1 'base ''UserName)
+-- instance Version UserName
+-- $(deriveSerialize ''UserName)
 
 newtype UserPassId = UserPassId { unUserPassId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version UserPassId
-$(deriveSerialize ''UserPassId)
-$(deriveNewData [''UserPassId])
+$(deriveSafeCopy 1 'base ''UserPassId)
+-- instance Version UserPassId
+-- $(deriveSerialize ''UserPassId)
+-- $(deriveNewData [''UserPassId])
 
 succUserPassId :: UserPassId -> UserPassId
 succUserPassId (UserPassId i) = UserPassId (succ i)
@@ -105,17 +115,18 @@ data UserPass
                , upId       :: UserPassId
                }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
-
-instance Version UserPass
-$(deriveSerialize ''UserPass)
+$(deriveSafeCopy 1 'base ''UserPass)
+-- instance Version UserPass
+-- $(deriveSerialize ''UserPass)
 
 $(inferIxSet "UserPasses" ''UserPass 'noCalcs [''UserName, ''HashedPass, ''AuthId, ''UserPassId])
 
 -- * Identifier
 
-instance Version Identifier
-$(deriveSerialize ''Identifier)
-$(deriveNewData [''Identifier])
+$(deriveSafeCopy 1 'base ''Identifier)
+-- instance Version Identifier
+-- $(deriveSerialize ''Identifier)
+-- $(deriveNewData [''Identifier])
 
 -- * AuthMap
 
@@ -126,8 +137,9 @@ data AuthMethod
                      }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-instance Version AuthMethod
-$(deriveSerialize ''AuthMethod)
+$(deriveSafeCopy 1 'base ''AuthMethod)
+-- instance Version AuthMethod
+-- $(deriveSerialize ''AuthMethod)
 
 
 data AuthMap 
@@ -136,8 +148,9 @@ data AuthMap
               }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-instance Version AuthMap
-$(deriveSerialize ''AuthMap)
+$(deriveSafeCopy 1 'base ''AuthMap)
+-- instance Version AuthMap
+-- $(deriveSerialize ''AuthMap)
 
 $(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''AuthMethod, ''Identifier, ''UserPassId])
 
@@ -150,10 +163,13 @@ data AuthToken
                 , tokenAuthMethod :: AuthMethod
                 }
       deriving (Eq, Ord, Data, Show, Typeable)
-$(deriveSerialize ''AuthToken)
-instance Version AuthToken
+$(deriveSafeCopy 1 'base ''AuthToken)
+-- $(deriveSerialize ''AuthToken)
+-- instance Version AuthToken
 
 $(inferIxSet "AuthTokens" ''AuthToken 'noCalcs [''String, ''AuthId])
+
+
 
 -- * AuthState
 
@@ -169,28 +185,28 @@ data AuthState
                 , nextUserPassId  :: UserPassId
                 , authMaps        :: AuthMaps
                 , nextAuthId      :: AuthId
---                , preferedIdentifierAuthId :: Map Identifier AuthId
                 , authTokens      :: AuthTokens
                 }
       deriving (Data, Eq, Show, Typeable)
-$(deriveSerialize ''AuthState)
-instance Version AuthState
+$(deriveSafeCopy 1 'base ''AuthState)
+-- $(deriveSerialize ''AuthState)
+-- instance Version AuthState
 
-instance Component AuthState where
-    type Dependencies AuthState = End
-    initialValue = AuthState { userPasses      = IxSet.empty
-                             , nextUserPassId  = UserPassId 1
-                             , authMaps        = IxSet.empty
-                             , authTokens      = IxSet.empty
---                             , preferedIdentifierAuthId = Map.empty
-                             , nextAuthId      = AuthId 1
-                             }
+-- | a reasonable initial 'AuthState'
+initialAuthState :: AuthState
+initialAuthState =
+    AuthState { userPasses      = IxSet.empty
+              , nextUserPassId  = UserPassId 1
+              , authMaps        = IxSet.empty
+              , authTokens      = IxSet.empty
+              , nextAuthId      = AuthId 1
+              }
 
 -- ** UserPass
 
 modifyUserPass :: UserPassId -> (UserPass -> UserPass) -> Update AuthState (Maybe UserPassError)
 modifyUserPass upid fn =
-    do as@(AuthState {..}) <- ask
+    do as@(AuthState {..}) <- get
        case getOne $ userPasses @= upid of
          Nothing -> return (Just $ InvalidUserPassId upid)
          (Just userPass) ->
@@ -205,8 +221,9 @@ data UserPassError
     | InvalidUserName UserName
     | InvalidPassword
       deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version UserPassError
-$(deriveSerialize ''UserPassError)
+$(deriveSafeCopy 1 'base ''UserPassError)
+-- instance Version UserPassError
+-- $(deriveSerialize ''UserPassError)
 
 -- | return a user-friendly error message string for an 'AddAuthError'
 userPassErrorString :: UserPassError -> String
@@ -236,7 +253,7 @@ createUserPass name hashedPass =
 -- this will break password salting...
 setUserName :: UserPassId -> Text -> Update AuthState (Maybe UserPassError)
 setUserName upid name =
-    do as <- ask
+    do as <- get
        if nameAvailable (userPasses as)
          then case getOne $ (userPasses as) @= upid of
                 (Just userPass) ->
@@ -288,12 +305,12 @@ askUserPass uid =
 
 addAuthMethod :: AuthMethod -> AuthId -> Update AuthState ()
 addAuthMethod authMethod authid =
-    do as@(AuthState{..}) <- ask
+    do as@(AuthState{..}) <- get
        put $ as { authMaps = IxSet.insert (AuthMap authMethod authid) authMaps }
 
 newAuthMethod :: AuthMethod -> Update AuthState AuthId
 newAuthMethod authMethod =
-    do as@(AuthState{..}) <- ask
+    do as@(AuthState{..}) <- get
        put $ as { authMaps = IxSet.insert (AuthMap authMethod nextAuthId) authMaps 
                 , nextAuthId = succAuthId nextAuthId
                 }
@@ -301,7 +318,7 @@ newAuthMethod authMethod =
 
 removeAuthIdentifier :: Identifier -> AuthId -> Update AuthState ()
 removeAuthIdentifier identifier authid =
-    do as@(AuthState{..}) <- ask
+    do as@(AuthState{..}) <- get
        put $ as { authMaps = IxSet.delete (AuthMap (AuthIdentifier identifier) authid) authMaps }
 
 identifierAuthIds :: Identifier -> Query AuthState (Set AuthId)
@@ -311,12 +328,12 @@ identifierAuthIds identifier =
     
 addAuthUserPassId :: UserPassId -> AuthId -> Update AuthState ()
 addAuthUserPassId upid authid =
-    do as@(AuthState{..}) <- ask
+    do as@(AuthState{..}) <- get
        put $ as { authMaps = IxSet.insert (AuthMap (AuthUserPassId upid) authid) authMaps }
 
 removeAuthUserPassId :: UserPassId -> AuthId -> Update AuthState ()
 removeAuthUserPassId upid authid =
-    do as@(AuthState{..}) <- ask
+    do as@(AuthState{..}) <- get
        put $ as { authMaps = IxSet.delete (AuthMap (AuthUserPassId upid) authid) authMaps }
 
 userPassIdAuthIds :: UserPassId -> Query AuthState (Set AuthId)
@@ -385,7 +402,7 @@ genAuthId =
 askAuthState :: Query AuthState AuthState
 askAuthState = ask
 
-$(mkMethods ''AuthState [ 'askUserPass
+$(makeAcidic ''AuthState [ 'askUserPass
                         , 'checkUserPass
                         , 'createUserPass
                         , 'setUserName
@@ -408,33 +425,33 @@ $(mkMethods ''AuthState [ 'askUserPass
 
 -- * happstack-server level stuff
 
-addAuthCookie :: (Happstack m) => Maybe AuthId -> AuthMethod -> m ()
-addAuthCookie aid authMethod =
+addAuthCookie :: (Happstack m) => AcidState AuthState -> Maybe AuthId -> AuthMethod -> m ()
+addAuthCookie acidH aid authMethod =
     do authToken <- genAuthToken aid authMethod (60*60) 
-       update (AddAuthToken authToken)
+       update' acidH (AddAuthToken authToken)
        addCookie Session (mkCookie "authToken" (tokenString authToken))
        return ()
 
-deleteAuthCookie :: (Happstack m, Alternative m) => m ()
-deleteAuthCookie =
+deleteAuthCookie :: (Happstack m, Alternative m) => AcidState AuthState -> m ()
+deleteAuthCookie acidH =
     do mTokenStr <- optional $ lookCookieValue "authToken"
        case mTokenStr of
          Nothing         -> return ()
          (Just tokenStr) -> 
              do expireCookie "authToken"
-                update (DeleteAuthToken tokenStr)
+                update' acidH (DeleteAuthToken tokenStr)
 
-getAuthToken :: (Alternative m, Happstack m) => m (Maybe AuthToken)
-getAuthToken =
+getAuthToken :: (Alternative m, Happstack m) => AcidState AuthState -> m (Maybe AuthToken)
+getAuthToken acidH =
     do mTokenStr <- optional $ lookCookieValue "authToken"
        case mTokenStr of
          Nothing -> return Nothing
          (Just tokenStr) ->
-             query (AskAuthToken tokenStr)
+             query' acidH (AskAuthToken tokenStr)
              
-getAuthId :: (Alternative m, Happstack m) => m (Maybe AuthId)
-getAuthId =
+getAuthId :: (Alternative m, Happstack m) => AcidState AuthState -> m (Maybe AuthId)
+getAuthId acidH =
     do mTokenStr <- optional $ lookCookieValue "authToken"
        case mTokenStr of
          Nothing         -> return Nothing
-         (Just tokenStr) -> query (AuthTokenAuthId tokenStr)
+         (Just tokenStr) -> query' acidH (AuthTokenAuthId tokenStr)

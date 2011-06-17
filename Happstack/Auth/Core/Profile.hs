@@ -8,16 +8,16 @@ module Happstack.Auth.Core.Profile where
 import Control.Applicative 
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Acid           (AcidState, Update, Query, makeAcidic, query', update')
 import Data.Data
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
-import Data.Text (Text)
+import Data.Map            (Map)
+import qualified Data.Map  as Map
+import Data.SafeCopy       (base, deriveSafeCopy)
+import Data.Set            (Set)
+import qualified Data.Set  as Set
+import Data.Text           (Text)
 import qualified Data.Text as Text
 import Happstack.Auth.Core.Auth
-import Happstack.Data
-import Happstack.State
 import Happstack.Server
 import           Happstack.Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
 import qualified Happstack.Data.IxSet as IxSet
@@ -25,9 +25,7 @@ import Web.Routes
 
 newtype UserId = UserId { unUserId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version UserId
-$(deriveSerialize ''UserId)
-$(deriveNewData [''UserId])
+$(deriveSafeCopy 1 'base ''UserId)
 
 instance PathInfo UserId where
     toPathSegments (UserId i) = toPathSegments i
@@ -44,9 +42,7 @@ data Profile
     , nickName :: Text
     }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version Profile
-$(deriveSerialize ''Profile)
-$(deriveNewData [''Profile])
+$(deriveSafeCopy 1 'base ''Profile)
 
 $(inferIxSet "Profiles" ''Profile 'noCalcs [''UserId, ''AuthId])
 
@@ -56,13 +52,11 @@ data ProfileState
                    , nextUserId  :: UserId
                    }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
-instance Version ProfileState
-$(deriveSerialize ''ProfileState)
-$(deriveNewData [''ProfileState])
+$(deriveSafeCopy 1 'base ''ProfileState)
 
-instance Component ProfileState where
-    type Dependencies ProfileState = End
-    initialValue =
+-- | a reasonable initial 'ProfileState'
+initialProfileState :: ProfileState
+initialProfileState =
         ProfileState { profiles    = IxSet.empty
                      , authUserMap = Map.empty
                      , nextUserId  = UserId 1
@@ -90,7 +84,7 @@ authIdProfiles aid =
 
 setAuthIdUserId :: AuthId -> UserId -> Update ProfileState ()
 setAuthIdUserId authId userId =
-    do ps@(ProfileState{..}) <- ask
+    do ps@(ProfileState{..}) <- get
        put $ ps { authUserMap = Map.insert authId userId authUserMap }
 
 createNewProfile :: Set AuthId -> Update ProfileState UserId
@@ -105,7 +99,7 @@ createNewProfile authIds =
                  })
        return nextUserId
 
-$(mkMethods ''ProfileState 
+$(makeAcidic ''ProfileState 
                 [ 'authIdUserId
                 , 'authIdProfiles
                 , 'setAuthIdUserId
@@ -113,15 +107,15 @@ $(mkMethods ''ProfileState
                 , 'genUserId
                 ])
 
-getUserId :: (Alternative m, Happstack m) => m (Maybe UserId)
-getUserId =
-    do mAuthToken <- getAuthToken 
+getUserId :: (Alternative m, Happstack m) => AcidState AuthState -> AcidState ProfileState -> m (Maybe UserId)
+getUserId authStateH profileStateH =
+    do mAuthToken <- getAuthToken  authStateH
        case mAuthToken of
          Nothing -> return Nothing
          (Just authToken) ->
              case tokenAuthId authToken of
                Nothing -> return Nothing
-               (Just authId) -> query (AuthIdUserId authId)
+               (Just authId) -> query' profileStateH (AuthIdUserId authId)
 
 
 

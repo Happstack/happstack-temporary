@@ -3,8 +3,9 @@ module ProfileData where
 
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Acid
 import Data.Generics
-import Happstack.State
+import Data.SafeCopy
 import Happstack.Auth.Core.Profile
 import Happstack.Data.IxSet        (IxSet, (@=), getOne, inferIxSet, noCalcs)
 import Happstack.Server
@@ -18,17 +19,14 @@ data ProfileData =
                 , profileMsg :: Text
                 }
     deriving (Eq, Ord, Read, Show, Typeable, Data)
-
-instance Version ProfileData
-$(deriveSerialize ''ProfileData)
+$(deriveSafeCopy 1 'base ''ProfileData)
 
 $(inferIxSet "ProfilesData" ''ProfileData 'noCalcs [''UserId, ''Text])
 
 data ProfileDataState =
     ProfileDataState { profilesData :: ProfilesData }
     deriving (Eq, Ord, Read, Show, Typeable, Data)
-instance Version ProfileDataState
-$(deriveSerialize ''ProfileDataState)
+$(deriveSafeCopy 1 'base ''ProfileDataState)
 
 newProfileData :: UserId -> Text -> Update ProfileDataState ProfileData
 newProfileData uid msg =
@@ -42,15 +40,14 @@ askProfileData uid =
     do ProfileDataState{..} <- ask
        return $ getOne $ profilesData @= uid
 
-$(mkMethods ''ProfileDataState 
+$(makeAcidic ''ProfileDataState 
                 [ 'newProfileData
                 , 'askProfileData
                 ]
  )
-
-instance Component ProfileDataState where
-    type Dependencies ProfileDataState = End
-    initialValue = ProfileDataState { profilesData = IxSet.empty }
+ 
+initialProfileDataState :: ProfileDataState
+initialProfileDataState = ProfileDataState { profilesData = IxSet.empty }
 
 data ProfileDataURL 
     = CreateNewProfileData 
@@ -59,15 +56,15 @@ data ProfileDataURL
 
 $(derivePathInfo ''ProfileDataURL)
 
-handleProfileData url =
+handleProfileData authStateH profileStateH profileDataStateH url =
     case url of
       CreateNewProfileData ->
-          do mUserId <- getUserId
+          do mUserId <- getUserId authStateH profileStateH
              case mUserId of
                Nothing -> internalServerError $ toResponse $ "not logged in."
                (Just userId) ->
-                   do update (NewProfileData userId (Text.pack "this is the default message."))
+                   do update' profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
                       seeOther "/" (toResponse "/")
       (ViewProfileData uid) ->
-          do mProfileData <- query (AskProfileData uid)
+          do mProfileData <- query' profileDataStateH (AskProfileData uid)
              ok $ toResponse $ show mProfileData

@@ -6,7 +6,6 @@ import Control.Applicative
 import Control.Monad.Trans
 import HSP (XMLGenT(..), EmbedAsChild(..), EmbedAsAttr(..), Attr(..), XML, genElement, genEElement, unXMLGenT)
 import HSP.Google.Analytics (analytics)
-import Happstack.State
 import Happstack.Server
 import Happstack.Server.HSP.HTML ()
 import Happstack.Server.HSX ()
@@ -54,13 +53,3 @@ appTemplate ::
     -> m Response
 appTemplate title headers body =
     toResponse <$> (unXMLGenT (appTemplate' title headers body))
-
-
--- | move to happstack?
-queryJust :: (MonadIO m, WebMonad Response m, FilterMonad Response m, Show ev, QueryEvent ev (Maybe res)) => ev -> m res
-queryJust ev =
-    do mr <- query ev
-       case mr of
-         Nothing  -> escape $ internalServerError $ toResponse ("query returned Nothing: " ++ show ev)
-         (Just r) -> return r
-
