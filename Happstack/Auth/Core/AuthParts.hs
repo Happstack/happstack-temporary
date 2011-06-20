@@ -68,7 +68,7 @@ connect :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) =>
 connect authMode realm url = 
     do openIdUrl <- showURL (O_OpenId authMode)
        gotoURL <- liftIO $ getForwardUrl (T.pack url) (T.pack openIdUrl) (T.pack <$> realm) []
-       seeOther gotoURL (toResponse gotoURL)
+       seeOther (T.unpack gotoURL) (toResponse gotoURL)
 
 -- type ProviderPage m p = (OpenIdURL p) -> AuthMode -> m Response
 
