@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.3.1) unstable; urgency=low
+
+  * Updated to authenticate >= 0.9
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Mon, 20 Jun 2011 13:27:08 -0500
+
 haskell-happstack-authenticate (0.3.0) unstable; urgency=low
 
   * Ported to acid-state

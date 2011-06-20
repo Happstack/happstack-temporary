@@ -7,6 +7,9 @@ import Data.Acid                  (AcidState, query', update')
 import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
 import qualified Data.Set         as Set
+import qualified Data.Text               as T
+import qualified Data.Text.Lazy          as TL
+import qualified Data.Text.Lazy.Encoding as TL
 import Happstack.Server
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.AuthURL
@@ -37,8 +40,8 @@ openIdPage acid AddIdentifierMode onAuthURL =
 -- this get's the identifier the openid provider provides. It is our only chance to capture the Identifier. So, before we send a Response we need to have some sort of cookie set that identifies the user. We can not just put the identifier in the cookie because we don't want some one to fake it.
 getIdentifier :: (Happstack m) => m Identifier
 getIdentifier =
-    do pairs'      <- lookPairs
-       let pairs = mapMaybe (\(k, ev) -> case ev of (Left _) -> Nothing ; (Right v) -> Just (k, v)) pairs'
+    do pairs'      <- lookPairsBS
+       let pairs = mapMaybe (\(k, ev) -> case ev of (Left _) -> Nothing ; (Right v) -> Just (T.pack k, TL.toStrict $ TL.decodeUtf8 v)) pairs'
        (identifier, _) <- liftIO $ authenticate pairs
        return identifier
 
@@ -64,7 +67,7 @@ connect :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) =>
            -> m Response
 connect authMode realm url = 
     do openIdUrl <- showURL (O_OpenId authMode)
-       gotoURL <- liftIO $ getForwardUrl url openIdUrl realm []
+       gotoURL <- liftIO $ getForwardUrl (T.pack url) (T.pack openIdUrl) (T.pack <$> realm) []
        seeOther gotoURL (toResponse gotoURL)
 
 -- type ProviderPage m p = (OpenIdURL p) -> AuthMode -> m Response
