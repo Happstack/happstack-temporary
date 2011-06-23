@@ -9,7 +9,7 @@ Synopsis: A demo of the happstack-authenticate library
 Description:
  happstack-authenticate supports user account authentication using OpenId or plain old username + password.
 Cabal-version: >= 1.8
-Build-type: Custom
+Build-type: Simple
 
 Flag base4
     Description: Choose the even newer, even smaller, split-up base package.
@@ -18,15 +18,17 @@ Executable demo-server
  Main-Is: Main.hs
 
  GHC-Options: -threaded -Wall -Wwarn -O2 -rtsopts -fno-warn-name-shadowing -fno-warn-missing-signatures -fwarn-tabs -fno-warn-unused-binds -fno-warn-orphans -fwarn-unused-imports -fno-spec-constr
- Build-depends: happstack-authenticate,
+ Build-depends: acid-state,
+                filepath,
+                happstack-authenticate,
                 happstack-data,
                 happstack-hsp,
                 happstack-ixset, 
-                happstack-state, 
                 happstack-server, 
                 hsx, 
                 hsp, 
                 mtl, 
+                safecopy,
                 text >= 0.11, 
                 web-routes, 
                 web-routes-happstack, 

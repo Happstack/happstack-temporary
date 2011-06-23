@@ -3,45 +3,44 @@
 -- | NOTE: this must be compiled with -threaded
 module Main where
 
-import Acid
-import Control.Applicative (Alternative(..))
-import Control.Concurrent (forkIO, killThread)
-import Control.Monad (liftM, msum, mzero)
-import Control.Monad.Trans (liftIO)
-import Data.Acid (query')
-import Data.Data
-import Happstack.Server
-import Happstack.Server.HSP.HTML (defaultTemplate)
+import Acid                              (Acid(..), withAcid)
+import Control.Concurrent                (forkIO, killThread)
+import Control.Monad                     (liftM, msum, mzero)
+import Control.Monad.Trans               (liftIO)
+import Data.Acid                         (query')
+import Happstack.Server                  ( Response(..), ServerPartT, ServerMonad(..), decodeBody
+                                         , defaultBodyPolicy, dir, nullDir, ok, validateConf
+                                         , seeOther, setValidatorSP, simpleHTTP, toResponse)
+import Happstack.Server.HSP.HTML         (defaultTemplate)
 import HSP
 import qualified HSX.XMLGenerator as HSX
--- import Pages.AppTemplate
-import Pages.Home
-import Happstack.Auth.Core.Auth
-import Happstack.Auth.Core.AuthParts
-import Happstack.Auth.Core.AuthURL
-import Happstack.Auth.Core.Profile
-import Happstack.Auth.Core.ProfileParts
-import Happstack.Auth.Core.ProfileURL
-import Happstack.Auth.HSP.Login
-import ProfileData
-import SiteURL
-import System.Environment
-import Web.Routes
-import Web.Routes.Happstack          (implSite_)
-import Web.Routes.XMLGenT ()
-import Web.Routes.TH
+import Pages.Home                        (homePage)
+import Happstack.Auth.Core.Auth          (AskAuthState(..))
+import Happstack.Auth.Core.ProfileURL    (ProfileURL(P_PickProfile))
+import Happstack.Auth.HSP.Login          (handleAuth, handleProfile)
+import ProfileData                       (ProfileDataURL(CreateNewProfileData), handleProfileData)
+import SiteURL                           (SiteURL(..))
+import System.Environment                (getArgs)
+import System.Exit                       (exitFailure)
+import Web.Routes                        (Site(..), PathInfo(..), RouteT(..), setDefault, showURL, nestURL, parseSegments)
+import Web.Routes.Happstack              (implSite_)
+import Web.Routes.XMLGenT                ()
 
 defaultTemplate' :: (XMLGenerator m, EmbedAsChild m h, EmbedAsChild m b, HSX.XML m ~ XML) => String -> h -> b -> m Response
 defaultTemplate' t h b = liftM toResponse (defaultTemplate t h b)
 
 main :: IO ()
 main = 
-    do [baseURI] <- getArgs
-       withAcid Nothing $ \acid ->
-           do tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl acid baseURI)
-              putStrLn "started. Press <enter> to exit."
-              getLine
-              killThread tid
+    do args <- getArgs
+       case args of
+         [baseURI] ->
+             withAcid Nothing $ \acid ->
+               do tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl acid baseURI)
+                  putStrLn "started. Press <enter> to exit."
+                  _ <- getLine
+                  killThread tid
+         _ -> do putStrLn "usage: demo http://example.org:8000/"
+                 exitFailure
 
 printResponse :: Response -> IO Response
 printResponse res =
