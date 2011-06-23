@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.3.2) unstable; urgency=low
+
+  * bumped happstack-server upper bounds to < 6.2
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Thu, 23 Jun 2011 16:07:22 -0500
+
 haskell-happstack-authenticate (0.3.1) unstable; urgency=low
 
   * Updated to authenticate >= 0.9
