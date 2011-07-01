@@ -150,18 +150,6 @@ liveJournalForm :: (Functor v, Monad v, XMLGenerator m) => Form v [Input] String
 liveJournalForm = 
     label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* submit "Connect"
 
-{-
-handleAuth :: ( Happstack m
-              , Alternative m
-              , EmbedAsAttr (RouteT AuthURL m) (Attr String AuthURL)
-              ) =>
-              (forall header body. (EmbedAsChild (RouteT AuthURL m) XML, EmbedAsChild (RouteT AuthURL m) header, EmbedAsChild (RouteT AuthURL m) body) => (String  -> header -> body -> RouteT AuthURL m Response))
-     -> Maybe String
-     -> String
-     -> AuthURL
-     -> RouteT AuthURL m Response
--}
-
 handleAuth ::
   (Happstack m, Alternative m) =>
      AcidState AuthState 
@@ -186,10 +174,7 @@ handleAuth authStateH appTemplate realm onAuthURL url =
 handleProfile :: (Happstack m, Alternative m) =>
                  AcidState AuthState
               -> AcidState ProfileState
-              -> (forall header body. ( EmbedAsChild (RouteT ProfileURL m) XML
-                                      , EmbedAsChild (RouteT ProfileURL m) header
-                                      , EmbedAsChild (RouteT ProfileURL m) body) => 
-                             (String  -> header -> body -> RouteT ProfileURL m Response))
+              -> (String -> () -> XMLGenT (RouteT ProfileURL m) XML -> RouteT ProfileURL m Response)
               -> String
               -> ProfileURL 
               -> RouteT ProfileURL m Response
