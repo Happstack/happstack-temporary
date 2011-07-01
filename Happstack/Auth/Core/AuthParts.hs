@@ -1,19 +1,24 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns, RecordWildCards #-}
 module Happstack.Auth.Core.AuthParts where
 
 import Control.Applicative
 import Control.Monad.Trans
 import Data.Acid                  (AcidState, query', update')
+import Data.Aeson                 (Value(..))
+import qualified Data.Map         as Map
 import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
 import qualified Data.Set         as Set
 import qualified Data.Text               as T
+import           Data.Text               (Text)
 import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import Happstack.Server
-import Happstack.Auth.Core.Auth
+import Happstack.Auth.Core.Auth   
 import Happstack.Auth.Core.AuthURL
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
+import Web.Authenticate.Facebook  (Facebook(..), getAccessToken, getGraphData)
+import qualified Web.Authenticate.Facebook as Facebook
 import Web.Routes
 
 -- this verifies the identifier
@@ -26,7 +31,7 @@ openIdPage :: (Alternative m, Happstack m) =>
            -> m Response
 openIdPage acid LoginMode onAuthURL = 
     do identifier <- getIdentifier
-       addAuthIdsCookie acid identifier
+       identifierAddAuthIdsCookie acid identifier
        seeOther onAuthURL (toResponse ())
 openIdPage acid AddIdentifierMode onAuthURL =
     do identifier <- getIdentifier
@@ -50,8 +55,8 @@ getIdentifier =
 -- so, if there are no AuthIds associated with the identifier, we create one.
 --
 -- we have another problem though.. we want to allow a user to specify a prefered AuthId. But that preference needs to be linked to a specific Identifier ?
-addAuthIdsCookie :: (Happstack m) => AcidState AuthState -> Identifier -> m (Maybe AuthId)
-addAuthIdsCookie acid identifier =
+identifierAddAuthIdsCookie :: (Happstack m) => AcidState AuthState -> Identifier -> m (Maybe AuthId)
+identifierAddAuthIdsCookie acid identifier =
     do authId <- 
            do authIds <- query' acid (IdentifierAuthIds identifier)
               case Set.size authIds of
@@ -59,6 +64,17 @@ addAuthIdsCookie acid identifier =
                 n -> return $ Nothing
        addAuthCookie acid authId (AuthIdentifier identifier)
        return authId
+
+facebookAddAuthIdsCookie :: (Happstack m) => AcidState AuthState -> FacebookId -> m (Maybe AuthId)
+facebookAddAuthIdsCookie acid facebookId =
+    do authId <- 
+           do authIds <- query' acid (FacebookAuthIds facebookId)
+              case Set.size authIds of
+                1 -> return $ (Just $ head $ Set.toList $ authIds)
+                n -> return $ Nothing
+       addAuthCookie acid authId (AuthFacebook facebookId)
+       return authId
+
 
 connect :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) => 
               AuthMode     -- ^ authentication mode
@@ -84,3 +100,47 @@ handleOpenId acid realm onAuthURL url =
       (O_Connect authMode)                 -> 
           do url <- look "url"
              connect authMode realm url
+
+makeFacebook :: (Monad m, URL m ~ AuthURL, ShowURL m) => 
+                Text 
+             -> Text
+             -> AuthMode
+             -> m Facebook
+makeFacebook clientId clientSecret authMode =
+    do redirectUri <- showURL (A_FacebookRedirect authMode)
+       return (Facebook { facebookClientId     = clientId
+                        , facebookClientSecret = clientSecret
+                        , facebookRedirectUri  = T.pack redirectUri 
+                        })
+
+facebookPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => Facebook -> AuthMode -> m Response
+facebookPage Facebook{..} authMode = 
+    do facebook <- makeFacebook facebookClientId facebookClientSecret authMode
+       let url = Facebook.getForwardUrl facebook []
+       seeOther (T.unpack url) (toResponse ())
+
+facebookRedirectPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
+                        AcidState AuthState
+                     -> Facebook
+                     -> String -- ^ onAuthURL
+                     -> AuthMode
+                     -> m Response
+facebookRedirectPage acidAuth Facebook{..} onAuthURL authMode =
+    do facebook <- makeFacebook facebookClientId facebookClientSecret authMode
+       code  <- lookText "code"
+       token <- liftIO $ getAccessToken facebook (TL.toStrict code)
+       gd    <- liftIO $ getGraphData token (T.pack "me")
+       case gd of
+         (Right (Object (Map.lookup (T.pack "id") -> (Just (String facebookId))))) ->
+             case authMode of
+               LoginMode ->
+                   do facebookAddAuthIdsCookie acidAuth (FacebookId facebookId)
+                      seeOther onAuthURL (toResponse ())
+               AddIdentifierMode ->
+                   do mAuthId <- getAuthId acidAuth
+                      case mAuthId of
+                        Nothing       -> internalServerError $ toResponse $ "Could not add new authentication method because the user is not logged in."
+                        (Just authId) ->
+                            do update' acidAuth (AddAuthMethod (AuthFacebook (FacebookId facebookId)) authId)
+                               seeOther onAuthURL (toResponse ())
+         _ -> internalServerError $ toResponse $ "failed to extract user id: " ++ show gd

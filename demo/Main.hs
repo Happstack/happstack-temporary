@@ -92,7 +92,7 @@ handle acid@Acid{..} realm url =
     case url of
       U_HomePage          -> homePage acid
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
-                                nestURL U_Auth $ handleAuth acidAuth defaultTemplate' realm onAuthURL auth
+                                nestURL U_Auth $ handleAuth acidAuth defaultTemplate' Nothing realm onAuthURL auth
       (U_Profile profile) -> do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
                                 nestURL U_Profile $ handleProfile acidAuth acidProfile defaultTemplate' postPickedURL profile
       (U_ProfileData profileDataURL) ->

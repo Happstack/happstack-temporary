@@ -77,6 +77,8 @@ data AuthURL
     | A_ChangePassword
     | A_OpenId OpenIdURL
     | A_OpenIdProvider AuthMode OpenIdProvider
+    | A_Facebook AuthMode
+    | A_FacebookRedirect AuthMode
       deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 data OpenIdURL
@@ -98,6 +100,8 @@ instance Arbitrary AuthURL where
                       , return A_ChangePassword
                       , A_OpenId <$> arbitrary
                       , A_OpenIdProvider <$> arbitrary <*> arbitrary
+                      , A_Facebook <$> arbitrary
+                      , A_FacebookRedirect <$> arbitrary
                       ]
 
 instance PathInfo OpenIdURL where
@@ -120,8 +124,10 @@ instance PathInfo AuthURL where
     toPathSegments A_CreateAccount  = ["create"]
     toPathSegments A_ChangePassword = ["change_password"]
     toPathSegments A_AddAuth        = ["add_auth"]
-    toPathSegments (A_OpenId o) = "openid" : toPathSegments o
+    toPathSegments (A_OpenId o)     = "openid" : toPathSegments o
     toPathSegments (A_OpenIdProvider authMode provider) = "provider" : toPathSegments authMode ++ toPathSegments provider 
+    toPathSegments (A_Facebook authMode)         = "facebook"          : toPathSegments authMode
+    toPathSegments (A_FacebookRedirect authMode) = "facebook-redirect" : toPathSegments authMode
 
     fromPathSegments =
         msum [ do segment "login"
@@ -142,6 +148,12 @@ instance PathInfo AuthURL where
                   authMode <- fromPathSegments
                   provider <- fromPathSegments
                   return (A_OpenIdProvider authMode provider)
+             , do segment "facebook"
+                  authMode <- fromPathSegments
+                  return (A_Facebook authMode)
+             , do segment "facebook-redirect"
+                  authMode <- fromPathSegments
+                  return (A_FacebookRedirect authMode)
              ]
 
 authUrlInverse :: Property

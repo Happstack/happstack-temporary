@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.4.0) unstable; urgency=low
+
+  * Added support for facebook authentication
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Fri, 01 Jul 2011 11:58:41 -0500
+
 haskell-happstack-authenticate (0.3.2) unstable; urgency=low
 
   * bumped happstack-server upper bounds to < 6.2

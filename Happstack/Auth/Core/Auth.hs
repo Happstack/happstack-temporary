@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeSynonymInstances, DeriveDataTypeable,
-    FlexibleInstances, MultiParamTypeClasses, FlexibleContexts,
+    FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts,
     UndecidableInstances, TypeOperators, RecordWildCards
     #-}
 module Happstack.Auth.Core.Auth
@@ -13,6 +13,7 @@ module Happstack.Auth.Core.Auth
     , initialAuthState
     , AuthToken(..)
     , AuthId(..)
+    , FacebookId(..)
     , AuthMethod(..)
     , mkHashedPass
     , genAuthToken
@@ -30,6 +31,7 @@ module Happstack.Auth.Core.Auth
     , NewAuthMethod(..)
     , RemoveAuthIdentifier(..)
     , IdentifierAuthIds(..)
+    , FacebookAuthIds(..)
     , AddAuthUserPassId(..)
     , RemoveAuthUserPassId(..)
     , UserPassIdAuthIds(..)
@@ -130,16 +132,36 @@ $(deriveSafeCopy 1 'base ''Identifier)
 
 -- * AuthMap
 
+data AuthMethod_v1
+    = AuthIdentifier_v1 { amIdentifier_v1 :: Identifier
+                     }
+    | AuthUserPassId_v1 { amUserPassId_v1 :: UserPassId
+                     }
+    deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+$(deriveSafeCopy 1 'base ''AuthMethod_v1)
+
+-- instance Version AuthMethod_v1
+-- $(deriveSerialize ''AuthMethod_v1)
+
+newtype FacebookId = FacebookId { unFacebookId :: Text }
+    deriving (Eq, Ord, Read, Show, Data, Typeable, SafeCopy)
+
 data AuthMethod
     = AuthIdentifier { amIdentifier :: Identifier
                      }
     | AuthUserPassId { amUserPassId :: UserPassId
                      }
+    | AuthFacebook   { amFacebookId :: FacebookId
+                     }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-$(deriveSafeCopy 1 'base ''AuthMethod)
--- instance Version AuthMethod
--- $(deriveSerialize ''AuthMethod)
+$(deriveSafeCopy 2 'extension ''AuthMethod)
+
+instance Migrate AuthMethod where
+    type MigrateFrom AuthMethod = AuthMethod_v1
+    migrate (AuthIdentifier_v1 ident) = AuthIdentifier ident
+    migrate (AuthUserPassId_v1 up)    = AuthUserPassId up
 
 
 data AuthMap 
@@ -152,7 +174,7 @@ $(deriveSafeCopy 1 'base ''AuthMap)
 -- instance Version AuthMap
 -- $(deriveSerialize ''AuthMap)
 
-$(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''AuthMethod, ''Identifier, ''UserPassId])
+$(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''AuthMethod, ''Identifier, ''UserPassId, ''FacebookId])
 
 -- * AuthToken
 
@@ -325,6 +347,12 @@ identifierAuthIds :: Identifier -> Query AuthState (Set AuthId)
 identifierAuthIds identifier =
     do as@(AuthState{..}) <- ask
        return $ Set.map amAuthId $ IxSet.toSet $ authMaps @= identifier
+
+facebookAuthIds :: FacebookId -> Query AuthState (Set AuthId)
+facebookAuthIds facebookId =
+    do as@(AuthState{..}) <- ask
+       return $ Set.map amAuthId $ IxSet.toSet $ authMaps @= facebookId
+
     
 addAuthUserPassId :: UserPassId -> AuthId -> Update AuthState ()
 addAuthUserPassId upid authid =
@@ -417,6 +445,7 @@ $(makeAcidic ''AuthState [ 'askUserPass
                         , 'newAuthMethod
                         , 'removeAuthIdentifier
                         , 'identifierAuthIds
+                        , 'facebookAuthIds
                         , 'addAuthUserPassId
                         , 'removeAuthUserPassId
                         , 'userPassIdAuthIds

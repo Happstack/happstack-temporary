@@ -29,6 +29,7 @@ import Text.Digestive.Forms.Happstack ()
 import Text.Digestive.HSP.Html4
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
+import Web.Authenticate.Facebook  (Facebook)
 import Web.Routes                 (RouteT, ShowURL, showURL, showURLParams, nestURL, URL)
 import Web.Routes.XMLGenT
 
@@ -41,26 +42,36 @@ logoutPage authStateH =
        <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
 
 
-loginPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
-loginPage =
+loginPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Maybe Facebook -> XMLGenT m (HSX.XML m)
+loginPage mFacebook =
       <ol>
        <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Yahoo)      >Login</a> with your Yahoo Account</li>
        <li><a href=(A_OpenIdProvider LoginMode LiveJournal)>Login</a> with your Live Journal Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Myspace)    >Login</a> with your Myspace Account</li>
        <li><a href=(A_OpenIdProvider LoginMode Generic)    >Login</a> with your OpenId Account</li>
-       <li><a href=A_Local                                 >Login</a> with a username and password.</li>
+       <li><a href=A_Local                                 >Login</a> with a username and password</li>
+       <% case mFacebook of 
+            Nothing -> []
+            (Just facebook) ->
+                [<li><a href=(A_Facebook LoginMode)        >Login</a> with your Facebook Account</li>]
+            %>
       </ol>
 
 
-addAuthPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => XMLGenT m (HSX.XML m)
-addAuthPage =
+addAuthPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Maybe Facebook -> XMLGenT m (HSX.XML m)
+addAuthPage mFacebook =
       <ol>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Google)     >Add</a> your Google</li>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Yahoo)      >Add</a> your Yahoo Account</li>
        <li><a href=(A_OpenIdProvider AddIdentifierMode LiveJournal)>Add</a> your Live Journal Account</li>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Myspace)    >Add</a> your Myspace Account</li>
        <li><a href=(A_OpenIdProvider AddIdentifierMode Generic)    >Add</a> your OpenId Account</li>
+       <% case mFacebook of 
+            Nothing -> []
+            (Just facebook) ->
+                [<li><a href=(A_Facebook AddIdentifierMode)        >Add</a> your Facebook Account</li>]
+            %>
       </ol>
 
 authPicker :: (XMLGenerator m, EmbedAsAttr m (Attr String ProfileURL)) => Set AuthId -> XMLGenT m (HSX.XML m)
@@ -154,14 +165,15 @@ handleAuth ::
   (Happstack m, Alternative m) =>
      AcidState AuthState 
   -> (String  -> () -> XMLGenT (RouteT AuthURL m) XML -> RouteT AuthURL m Response)
+  -> Maybe Facebook
   -> Maybe String
   -> String
   -> AuthURL
   -> RouteT AuthURL m Response
-handleAuth authStateH appTemplate realm onAuthURL url =
+handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
     case url of
-      A_Login           -> appTemplate "Login"    () loginPage
-      A_AddAuth         -> appTemplate "Add Auth" () addAuthPage
+      A_Login           -> appTemplate "Login"    () (loginPage mFacebook)
+      A_AddAuth         -> appTemplate "Add Auth" () (addAuthPage mFacebook)
       A_Logout          -> appTemplate "Logout"   () (logoutPage authStateH)
       A_Local           -> localLoginPage authStateH appTemplate url onAuthURL
       A_CreateAccount   -> createAccountPage authStateH appTemplate onAuthURL url
@@ -169,7 +181,15 @@ handleAuth authStateH appTemplate realm onAuthURL url =
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId authStateH realm onAuthURL oidURL
       (A_OpenIdProvider authMode provider) 
                         -> providerPage appTemplate provider url authMode
+      (A_Facebook authMode) 
+                        -> case mFacebook of
+                             Nothing -> internalServerError $ toResponse "Facebook authentication not configured."
+                             (Just facebook) -> facebookPage facebook authMode 
 
+      (A_FacebookRedirect authMode)
+                        -> case mFacebook of
+                             Nothing -> internalServerError $ toResponse "Facebook authentication not configured."
+                             (Just facebook) -> facebookRedirectPage authStateH facebook onAuthURL authMode
 
 handleProfile :: (Happstack m, Alternative m) =>
                  AcidState AuthState
