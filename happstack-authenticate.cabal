@@ -1,5 +1,5 @@
 Name:                happstack-authenticate
-Version:             0.4.0
+Version:             0.4.1
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
 Homepage:            http://src.seereason.com/happstack-authenticate
@@ -16,7 +16,8 @@ Cabal-version:       >=1.2
 Library
 
   Exposed-modules:     Happstack.Auth.HSP.FormPart, 
-                       Happstack.Auth.HSP.Login, 
+                       Happstack.Auth.HSP.Login,
+                       Happstack.Auth.HSP.AuthProfile,
                        Happstack.Auth.Core.Profile, 
                        Happstack.Auth.Core.Auth, 
                        Happstack.Auth.Core.ProfileURL, 

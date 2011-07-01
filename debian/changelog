@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.4.1) unstable; urgency=low
+
+  * Added Happstack.Auth.HSP.AuthProfile
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Fri, 01 Jul 2011 12:46:05 -0500
+
 haskell-happstack-authenticate (0.4.0) unstable; urgency=low
 
   * Added support for facebook authentication
