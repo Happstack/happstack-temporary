@@ -120,5 +120,5 @@ unnest :: (AuthProfileURL -> [(String, String)] -> String)
        -> RouteT AuthProfileURL m Response 
        -> RouteT url m Response
 unnest showFn routeSP =
-    liftRouteT $ runRouteT routeSP showFn
+    liftRouteT $ unRouteT routeSP showFn
 
