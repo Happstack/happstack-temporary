@@ -15,6 +15,9 @@ module Happstack.Auth.Core.Auth
     , AuthId(..)
     , FacebookId(..)
     , AuthMethod(..)
+    , AuthMethod_v1(..)
+    , AuthMap(..)
+    , HashedPass(..)
     , mkHashedPass
     , genAuthToken
     , AskUserPass(..)
@@ -52,6 +55,8 @@ import Data.Acid
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Data (Data, Typeable)
+import qualified Data.IxSet as IxSet
+import           Data.IxSet (IxSet, (@=), inferIxSet, noCalcs, getOne, updateIx)
 import Data.Map (Map)
 import qualified Data.Map   as Map
 import Data.SafeCopy -- (base, deriveSafeCopy)
@@ -61,17 +66,9 @@ import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime,)
 import qualified Data.Text  as Text
 import qualified Data.Text.Encoding  as Text
 import           Data.Text  (Text)
-import qualified Happstack.Data.IxSet as IxSet
-import           Happstack.Data.IxSet (IxSet, inferIxSet, noCalcs)
-import Happstack.Data.IxSet ((@=), getOne, updateIx)
 import Web.Authenticate.OpenId
 import Web.Routes
 import Happstack.Server
-
-instance (SafeCopy a, Ord a, Typeable a, IxSet.Indexable a) => SafeCopy (IxSet a) where
-    putCopy ixSet = contain $ safePut (IxSet.toList ixSet)
-    getCopy = contain $ IxSet.fromList <$> safeGet
-
 
 newtype AuthId = AuthId { unAuthId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)

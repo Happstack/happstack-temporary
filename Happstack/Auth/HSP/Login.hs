@@ -39,44 +39,49 @@ import Web.Routes.XMLGenT
 logoutPage :: (XMLGenerator m, Alternative m, Happstack m, EmbedAsAttr m (Attr String AuthURL)) => AcidState AuthState -> XMLGenT m (HSX.XML m)
 logoutPage authStateH =
     do deleteAuthCookie authStateH 
-       <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
+       <div id="happstack-authenticate">
+        <p>You are now logged out. Click <a href=A_Login>here</a> to log in again.</p>
+        </div>
 
 
 loginPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Maybe Facebook -> XMLGenT m (HSX.XML m)
 loginPage mFacebook =
-      <ol>
-       <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google Account</li>
-       <li><a href=(A_OpenIdProvider LoginMode Yahoo)      >Login</a> with your Yahoo Account</li>
-       <li><a href=(A_OpenIdProvider LoginMode LiveJournal)>Login</a> with your Live Journal Account</li>
-       <li><a href=(A_OpenIdProvider LoginMode Myspace)    >Login</a> with your Myspace Account</li>
-       <li><a href=(A_OpenIdProvider LoginMode Generic)    >Login</a> with your OpenId Account</li>
-       <li><a href=A_Local                                 >Login</a> with a username and password</li>
-       <% case mFacebook of 
-            Nothing -> []
-            (Just facebook) ->
-                [<li><a href=(A_Facebook LoginMode)        >Login</a> with your Facebook Account</li>]
-            %>
-      </ol>
-
+      <div id="happstack-authenticate">
+       <ol>
+        <li><a href=(A_OpenIdProvider LoginMode Google)     >Login</a> with your Google Account</li>
+        <li><a href=(A_OpenIdProvider LoginMode Yahoo)      >Login</a> with your Yahoo Account</li>
+        <li><a href=(A_OpenIdProvider LoginMode LiveJournal)>Login</a> with your Live Journal Account</li>
+        <li><a href=(A_OpenIdProvider LoginMode Myspace)    >Login</a> with your Myspace Account</li>
+        <li><a href=(A_OpenIdProvider LoginMode Generic)    >Login</a> with your OpenId Account</li>
+        <li><a href=A_Local                                 >Login</a> with a username and password</li>
+        <% case mFacebook of 
+             Nothing -> []
+             (Just facebook) ->
+                 [<li><a href=(A_Facebook LoginMode)        >Login</a> with your Facebook Account</li>]
+             %>
+       </ol>
+      </div>
 
 addAuthPage :: (XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Maybe Facebook -> XMLGenT m (HSX.XML m)
 addAuthPage mFacebook =
-      <ol>
-       <li><a href=(A_OpenIdProvider AddIdentifierMode Google)     >Add</a> your Google</li>
-       <li><a href=(A_OpenIdProvider AddIdentifierMode Yahoo)      >Add</a> your Yahoo Account</li>
-       <li><a href=(A_OpenIdProvider AddIdentifierMode LiveJournal)>Add</a> your Live Journal Account</li>
-       <li><a href=(A_OpenIdProvider AddIdentifierMode Myspace)    >Add</a> your Myspace Account</li>
-       <li><a href=(A_OpenIdProvider AddIdentifierMode Generic)    >Add</a> your OpenId Account</li>
-       <% case mFacebook of 
-            Nothing -> []
-            (Just facebook) ->
-                [<li><a href=(A_Facebook AddIdentifierMode)        >Add</a> your Facebook Account</li>]
-            %>
-      </ol>
+      <div id="happstack-authenticate">
+       <ol>
+        <li><a href=(A_OpenIdProvider AddIdentifierMode Google)     >Add</a> your Google</li>
+        <li><a href=(A_OpenIdProvider AddIdentifierMode Yahoo)      >Add</a> your Yahoo Account</li>
+        <li><a href=(A_OpenIdProvider AddIdentifierMode LiveJournal)>Add</a> your Live Journal Account</li>
+        <li><a href=(A_OpenIdProvider AddIdentifierMode Myspace)    >Add</a> your Myspace Account</li>
+        <li><a href=(A_OpenIdProvider AddIdentifierMode Generic)    >Add</a> your OpenId Account</li>
+        <% case mFacebook of 
+             Nothing -> []
+             (Just facebook) ->
+                 [<li><a href=(A_Facebook AddIdentifierMode)        >Add</a> your Facebook Account</li>]
+             %>
+       </ol>
+      </div>
 
 authPicker :: (XMLGenerator m, EmbedAsAttr m (Attr String ProfileURL)) => Set AuthId -> XMLGenT m (HSX.XML m)
 authPicker authIds =
-    <div>
+    <div id="happstack-authenticate">
      <ul><% mapM auth (Set.toList authIds) %></ul>
     </div>
     where
@@ -87,7 +92,7 @@ personalityPicker :: (XMLGenerator m, EmbedAsChild m Text, EmbedAsAttr m (Attr S
                      Set Profile 
                   -> XMLGenT m (HSX.XML m)
 personalityPicker profiles =
-    <div>
+    <div id="happstack-authenticate">
      <ul><% mapM personality (Set.toList profiles) %></ul>
     </div>
     where
@@ -132,7 +137,7 @@ liveJournalPage :: (Happstack m, XMLGenerator m, ToMessage (HSX.XML m), EmbedAsC
 liveJournalPage appTemplate here authMode =
     do actionURL <- showURL here
        appTemplate "Login" () $
-        <div id="main">
+        <div id="happstack-authenticate">
          <h1>Login using your Live Journal account</h1>
          <p>Enter your livejournal account name to connect. You may be prompted to log into your livejournal account and to confirm the login.</p>
          <% formPart "p" actionURL handleSuccess (handleFailure appTemplate) liveJournalForm %>
@@ -151,9 +156,9 @@ handleFailure :: (XMLGenerator m, Happstack m, EmbedAsChild m (), ToMessage (HSX
 -}
 handleFailure appTemplate errs formXML =
             XMLGenT $ appTemplate "Login" ()
-               <div id="main">
+               <div id="happstack-authenticate">
                 <h1>Errors</h1>
-                <% errorList (map snd errs) %>
+--                <% errorList (map snd errs) %>
                 <% formXML %>
                </div>
 
@@ -232,7 +237,7 @@ localLoginPage :: (Happstack m, Alternative m) =>
 localLoginPage authStateH appTemplate here onAuthURL =
     do actionURL <- showURL here
        appTemplate "Login" () $
-         <div id="main">
+         <div id="happstack-authenticate">
            <h1>Login with a username and password</h1>
            <% formPart "p" actionURL (XMLGenT . handleLogin) (handleFailure appTemplate) loginForm %>
         </div>
@@ -265,22 +270,11 @@ localLoginPage authStateH appTemplate here onAuthURL =
                      (Left e) -> return (Left $ userPassErrorString e)
                      (Right userPassId) -> return (Right userPassId)
 
-        li :: a -> a
-        li = id
-             
-        ol :: a -> a
-        ol = id
-
-        fieldset :: a -> a
-        fieldset = id
-
-
-
 -- createAccountPage :: StoryPromptsURL -> StoryPrompts Response
 createAccountPage authStateH appTemplate onAuthURL here =
     do actionURL <- showURL here
        ok =<< appTemplate "Create User Account" () 
-          <div id="main">
+          <div id="happstack-authenticate">
            <h1>Create an account</h1>
            <% formPart "p" actionURL handleSuccess (handleFailure appTemplate) (newAccountForm authStateH) %>
           </div>
@@ -298,14 +292,13 @@ newAccountForm authStateH =
       br :: (XMLGenerator m, Monad v) => Form v [Input] String [XMLGenT m (HSX.XML m)] ()
       br = view [<br />]
       submitButton = li $ (submit "Create Account" `setAttrs` [("class" := "submit")])
-      username  = li $ ((label "username: "         ++> inputText Nothing)
-                   `validate` notEmpty) <++ errors
-      password1 = li $ label "password: "         ++> inputPassword
-      password2 = li $ label "confirm password: " ++> inputPassword
+      username  = li $ ((label "username: "         ++> inputText Nothing  <++ errors) `validate` notEmpty)
+      password1 = li $ label "password: "         ++> inputPassword <++ errors
+      password2 = li $ label "confirm password: " ++> inputPassword <++ errors
 --       password :: StoryForm String
       password = 
-          errors ++> (minLengthString 6 $ 
-                      (((,) <$> password1 <*> password2) `transform` samePassword))
+          (minLengthString 6 $ 
+           (((,) <$> password1 <*> password2) `transform` samePassword))
 
       samePassword = 
           transformEither $ \(p1, p2) ->
@@ -326,14 +319,10 @@ newAccountForm authStateH =
                           return (Right (authId, upId userPass))
 
 
-li :: a -> a
-li = id
-       
-ol :: a -> a
-ol = id
-
-fieldset :: a -> a
-fieldset = id
+fieldset, li, ol  :: (XMLGenerator m, Functor v, Monad v) => Form v [Input] String [XMLGenT m (HSX.XML m)] a -> Form v [Input] String [XMLGenT m (HSX.XML m)] a
+fieldset = mapView (\x -> [<fieldset><% x %></fieldset>])
+li       = mapView (\x -> [<li><% x %></li>])
+ol       = mapView (\x -> [<ol><% x %></ol>])
 
 notEmpty :: (Monad m) => Validator m String Text
 notEmpty = (check "field can not be empty") (not . Text.null)
@@ -356,18 +345,18 @@ changePasswordPage authStateH appTemplate here =
                       case mUserPass of
                         Nothing ->
                             internalServerError =<< appTemplate "Invalid UserPassId" () 
-                               <div id="main">
+                               <div id="happstack-authenticate">
                                  <p>Invalid UserPassId <% show $ unUserPassId userPassId %></p>
                                </div>
                         (Just userPass) ->
                             ok =<< appTemplate "Change Password" () 
-                                      <div id="main">
+                                      <div id="happstack-authenticate">
                                         <h1>Change Password for <% unUserName $ upName userPass %></h1>
                                         <% formPart "p" actionURL (XMLGenT . handleSuccess (upId userPass)) (handleFailure appTemplate) (changePasswordForm authStateH userPass) %>
                                       </div>
                    
                _ -> ok =<< appTemplate "Change Password Failure" ()
-                                 <div id="main">
+                                 <div id="happstack-authenticate">
                                   <p>This account does not use a username and password.</p>
                                  </div>
     where
@@ -377,12 +366,12 @@ changePasswordPage authStateH appTemplate here =
              case r of
                (Just e) -> 
                    internalServerError =<< appTemplate "Internal Server Error" ()
-                                         <div id="main">
+                                         <div id="happstack-authenticate">
                                           <p><% userPassErrorString e %></p>
                                          </div>
                Nothing ->
                    ok =<< appTemplate "Password Updated" ()
-                    <div>
+                    <div id="happstack-authenticate">
                      <p>Your password has updated.</p>
                     </div>
 

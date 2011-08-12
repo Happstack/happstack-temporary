@@ -1,3 +1,12 @@
+haskell-happstack-authenticate (0.5.0) unstable; urgency=low
+
+  * HSP - make sure all content is wrapped in 
+    <div id="happstack-authenticate">..</div>
+  * happstack-ixset -> ixset
+  * Restore fieldset, ol, li markup
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Fri, 12 Aug 2011 15:28:37 -0500
+
 haskell-happstack-authenticate (0.4.2) unstable; urgency=low
 
   * use unRouteT instead of runRouteT for better compatibility with

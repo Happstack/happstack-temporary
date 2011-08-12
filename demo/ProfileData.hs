@@ -5,13 +5,13 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Acid
 import Data.Generics
+import           Data.IxSet  (IxSet, (@=), getOne, inferIxSet, noCalcs)
+import qualified Data.IxSet  as IxSet
 import Data.SafeCopy
-import Happstack.Auth.Core.Profile
-import Happstack.Data.IxSet        (IxSet, (@=), getOne, inferIxSet, noCalcs)
-import Happstack.Server
-import qualified Happstack.Data.IxSet  as IxSet
 import Data.Text                   (Text)
 import qualified Data.Text         as Text
+import Happstack.Auth.Core.Profile
+import Happstack.Server
 import Web.Routes.TH
 
 data ProfileData = 
@@ -28,6 +28,7 @@ data ProfileDataState =
     deriving (Eq, Ord, Read, Show, Typeable, Data)
 $(deriveSafeCopy 1 'base ''ProfileDataState)
 
+-- FIXME: this should be idempotent
 newProfileData :: UserId -> Text -> Update ProfileDataState ProfileData
 newProfileData uid msg =
     do pds@(ProfileDataState {..}) <- get       

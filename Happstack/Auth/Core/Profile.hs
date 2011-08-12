@@ -10,6 +10,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Acid           (AcidState, Update, Query, makeAcidic, query', update')
 import Data.Data
+import           Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
+import qualified Data.IxSet as IxSet
 import Data.Map            (Map)
 import qualified Data.Map  as Map
 import Data.SafeCopy       (base, deriveSafeCopy)
@@ -19,8 +21,6 @@ import Data.Text           (Text)
 import qualified Data.Text as Text
 import Happstack.Auth.Core.Auth
 import Happstack.Server
-import           Happstack.Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
-import qualified Happstack.Data.IxSet as IxSet
 import Web.Routes
 
 newtype UserId = UserId { unUserId :: Integer }
