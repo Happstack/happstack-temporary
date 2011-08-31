@@ -27,7 +27,7 @@ Library
 
   Build-depends:       base > 4 && < 5,
                        acid-state,
-                       aeson,
+                       aeson-native,
                        authenticate >= 0.9,
                        bytestring,
                        containers,
