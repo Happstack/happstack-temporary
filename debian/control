@@ -27,7 +27,8 @@ Build-Depends: debhelper (>= 7.0),
                libghc-text-prof,
                libghc-web-routes-prof,
                libghc-web-routes-happstack-prof,
-               libghc-web-routes-hsp-prof
+               libghc-web-routes-hsp-prof,
+               trhsx
 Build-Depends-Indep: ghc-doc,
                      haddock,
                      libghc-quickcheck2-doc,
