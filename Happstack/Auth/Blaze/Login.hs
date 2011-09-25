@@ -26,7 +26,7 @@ import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Authenticate.Facebook  (Facebook)
 import Web.Routes                 (RouteT, ShowURL, showURL, showURLParams, nestURL, URL)
-import Text.Blaze.Html5            as H hiding (fieldset, ol, li, label)
+import Text.Blaze.Html5            as H hiding (fieldset, ol, li, label, head)
 import qualified Text.Blaze.Html5  as H
 import Text.Blaze.Html5.Attributes as A hiding (label)
 
@@ -40,7 +40,6 @@ logoutPage authStateH =
                    p $ do "You are now logged out. Click "
                           a ! href url $ "here"
                           " to log in again."
-
 
 loginPage :: (ShowURL m, URL m ~ AuthURL, Happstack m) => Maybe Facebook -> m Html
 loginPage mFacebook =
@@ -104,19 +103,19 @@ personalityPicker profiles =
           do url <- H.toValue <$> showURL (P_SetPersonality (userId profile))
              return $ H.li $ a ! href url $ (H.toHtml $ nickName profile)
 
-
-{-
-type PageTemplate x = String -> () -> (XMLGenT x (HSX.XML x)) -> XMLGenT x Response
-type PageTemplate' x = String -> () -> (XMLGenT x (HSX.XML x)) -> x Response
-
-providerPage :: (Happstack m, XMLGenerator m) => (forall body. (EmbedAsChild (RouteT AuthURL m) body) => (String -> () -> body -> XMLGenT (RouteT AuthURL m) Response)) -> OpenIdProvider -> AuthURL -> AuthMode -> RouteT AuthURL m Response
--}
+providerPage :: (URL m ~ AuthURL, Happstack m, ShowURL m) =>
+                (String -> Html -> Html -> m Response)
+             -> OpenIdProvider
+             -> AuthURL
+             -> AuthMode
+             -> m Response
 providerPage appTemplate provider =
     case provider of
       Google      -> googlePage
       Yahoo       -> yahooPage
---      LiveJournal -> liveJournalPage appTemplate
-      -- FIXME
+      LiveJournal -> liveJournalPage   appTemplate
+      Myspace     -> myspacePage       appTemplate
+      Generic     -> genericOpenIdPage appTemplate
 
 googlePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
               AuthURL
@@ -133,74 +132,102 @@ yahooPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
 yahooPage _here authMode =
     do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", yahoo)]
        seeOther u (toResponse ())
-{-
-{-
-liveJournalPage :: (Happstack m, XMLGenerator m, ToMessage (HSX.XML m), EmbedAsChild m (), Alternative m, ShowURL m, URL m ~ (OpenIdURL p)) =>
-                   PageTemplate m
-                -> OpenIdURL p
+
+myspacePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
+               (String -> Html -> Html -> m Response) 
+            -> AuthURL
+            -> AuthMode
+            -> m Response
+myspacePage appTemplate here authMode =
+    do actionURL <- showURL here
+       e <- eitherHappstackForm liveJournalForm "msp"
+       case e of
+         (Left formHtml) ->
+             do r <- appTemplate "Login via Myspace" mempty $
+                       H.div ! A.id "happstack-authenticate" $
+                        do h1 "Login using your myspace account"
+                           p "Enter your Myspace account name to connect."
+                           formToHtml actionURL formHtml
+                ok r
+         (Right username) ->
+             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", myspace username)]
+                seeOther u (toResponse ())
+      where 
+        usernameForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
+        usernameForm = 
+            label "http://www.myspace.com/" ++> inputText Nothing <* (mapHtml (\html -> html ! A.class_  "submit") $ submit "Login")
+
+liveJournalPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
+                   (String -> Html -> Html -> m Response)
+                -> AuthURL
                 -> AuthMode
                 -> m Response
--}
 liveJournalPage appTemplate here authMode =
     do actionURL <- showURL here
-       appTemplate "Login" () $
-        <div id="happstack-authenticate">
-         <h1>Login using your Live Journal account</h1>
-         <p>Enter your livejournal account name to connect. You may be prompted to log into your livejournal account and to confirm the login.</p>
-         <% formPart "p" actionURL handleSuccess (handleFailure appTemplate) liveJournalForm %>
-        </div>
-      where 
---         handleSuccess :: String -> XMLGenT (RouteT (OpenIdURL p) (ServerPartT IO)) Response
-        handleSuccess username =
-            do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", livejournal username)]
-               seeOther u (toResponse ())
--}
-{-
-{-
-handleFailure :: (XMLGenerator m, Happstack m, EmbedAsChild m (), ToMessage (HSX.XML m)) =>
-                 PageTemplate m
-              -> [(FormRange, String)] 
-              -> [XMLGenT m (HSX.XML m)]
-              -> XMLGenT m Response
--}
-handleFailure appTemplate errs formXML =
-            XMLGenT $ appTemplate "Login" ()
-               <div id="happstack-authenticate">
-                <h1>Errors</h1>
---                <% errorList (map snd errs) %>
-                <% formXML %>
-               </div>
+       e <- eitherHappstackForm liveJournalForm "ljp"
+       case e of 
+         (Left formHtml) ->
+             do r <- appTemplate "Login via LiveJournal" mempty $
+                     H.div ! A.id "happstack-authenticate" $
+                      do h1 $ "Login using your Live Journal account"
+                         p $ "Enter your livejournal account name to connect. You may be prompted to log into your livejournal account and to confirm the login."
+                         formToHtml actionURL formHtml
+                ok r
+         (Right username) ->
+             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", livejournal username)]
+                seeOther u (toResponse ())
 
-liveJournalForm :: (Functor v, Monad v, XMLGenerator m) => Form v [Input] String [XMLGenT m (HSX.XML m)] String
+liveJournalForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
 liveJournalForm = 
-    label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* submit "Connect"
--}
+    label "http://" ++> inputText Nothing <++ label ".livejournal.com/" <* (mapHtml (\html -> html ! A.class_  "submit") $ submit "Connect")
 
-{-
-handleAuth ::
-  (Happstack m, Alternative m) =>
-     AcidState AuthState 
-  -> (String  -> () -> XMLGenT (RouteT AuthURL m) XML -> RouteT AuthURL m Response)
-  -> Maybe Facebook
-  -> Maybe String
-  -> String
-  -> AuthURL
-  -> RouteT AuthURL m Response
--}
+
+genericOpenIdPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
+                     (String -> Html -> Html -> m Response)
+                  -> AuthURL
+                  -> AuthMode
+                  -> m Response
+genericOpenIdPage appTemplate here authMode =
+    do actionURL <- showURL here
+       e <- eitherHappstackForm openIdURLForm "oiu"
+       case e of
+         (Left formHtml) ->
+             do r <- appTemplate "Login via Generic OpenId" mempty $
+                       H.div ! A.id "happstack-authenticate" $
+                        do h1 "Login using your OpenId account"
+                           formToHtml actionURL formHtml
+                ok r
+         (Right url) ->
+             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", url)]
+                seeOther u (toResponse ())
+      where 
+        openIdURLForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
+        openIdURLForm = 
+            label "Your OpenId url: " ++> inputText Nothing <* submit "Connect"
+
+
+handleAuth :: (Happstack m) =>
+              AcidState AuthState
+           -> (String -> Html -> Html -> RouteT AuthURL m Response)
+           -> Maybe Facebook
+           -> Maybe String
+           -> String
+           -> AuthURL
+           -> RouteT AuthURL m Response
 handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
     case url of
       A_Login           -> appTemplate "Login"    mempty =<< loginPage mFacebook
       A_AddAuth         -> appTemplate "Add Auth" mempty =<< addAuthPage mFacebook
       A_Logout          -> appTemplate "Logout"   mempty =<< logoutPage authStateH
 
---      A_Local           -> localLoginPage authStateH appTemplate url onAuthURL
+      A_Local           -> localLoginPage authStateH appTemplate url onAuthURL
       A_CreateAccount   -> createAccountPage authStateH appTemplate onAuthURL url
       A_ChangePassword  -> changePasswordPage authStateH appTemplate url
-
       (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId authStateH realm onAuthURL oidURL
 
       (A_OpenIdProvider authMode provider) 
                         -> providerPage appTemplate provider url authMode
+
 
       (A_Facebook authMode) 
                         -> case mFacebook of
@@ -218,15 +245,13 @@ handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
                                            internalServerError resp
                              (Just facebook) -> facebookRedirectPage authStateH facebook onAuthURL authMode
 
-
-{-
-handleProfile :: (Happstack m, Alternative m) =>
+handleProfile :: (Happstack m, Alternative m, ShowURL m, URL m ~ ProfileURL) =>
                  AcidState AuthState
               -> AcidState ProfileState
-              -> (String -> () -> XMLGenT (RouteT ProfileURL m) XML -> RouteT ProfileURL m Response)
+              -> (String -> Html -> Html -> m Response)
               -> String
               -> ProfileURL 
-              -> RouteT ProfileURL m Response
+              -> m Response
 handleProfile authStateH profileStateH appTemplate postPickedURL url =
     case url of
       P_PickProfile        -> 
@@ -236,40 +261,34 @@ handleProfile authStateH profileStateH appTemplate postPickedURL url =
                    seeOther postPickedURL (toResponse postPickedURL)
 
                (PickPersonality profiles) -> 
-                   appTemplate "Pick Personality" () (personalityPicker profiles)
+                   appTemplate "Pick Personality" mempty =<< (personalityPicker profiles)
 
                (PickAuthId      authIds)  ->
-                   appTemplate "Pick Auth" () (authPicker authIds) 
+                   appTemplate "Pick Auth" mempty =<< (authPicker authIds) 
 
       (P_SetAuthId authId) -> 
           do b <- setAuthIdPage authStateH authId
              if b
-              then seeOther "/" (toResponse "") -- FIXME: don't hardcode destination
-              else unauthorized =<< 
-                     appTemplate "unauthorized" ()
-                        <p>Attempted to set AuthId to <% show $ unAuthId authId %>, but failed because the Identifier is not associated with that AuthId.</p>
-{-
-localLoginPage :: (Happstack m, Alternative m) =>
-                 (forall header body. ( EmbedAsChild (RouteT AuthURL m) XML
-                                      , EmbedAsChild (RouteT AuthURL m) header
-                                      , EmbedAsChild (RouteT AuthURL m) body) => 
-                             (String  -> header -> body -> RouteT AuthURL m Response))
-              -> AuthURL
-              -> String
-              -> RouteT AuthURL m Response
--}
--}
+              then seeOther ("/" :: String) (toResponse ()) -- FIXME: don't hardcode destination
+              else do resp <-  appTemplate "Unauthorized" mempty $
+                                 H.div ! A.id "happstack-authenticate" $
+                                   p $ do " Attempted to set AuthId to "
+                                          toHtml $show $ unAuthId authId
+                                          ", but failed because the Identifier is not associated with that AuthId."
+                      unauthorized resp
+
 localLoginPage authStateH appTemplate here onAuthURL =
     do actionURL <- showURL here
-       appTemplate "Login" () $
-         <div id="happstack-authenticate">
-           <h1>Login with a username and password</h1>
-           <% formPart "p" actionURL (XMLGenT . handleLogin) (handleFailure appTemplate) loginForm %>
-        </div>
-{-
-      where 
-        handleLogin :: (Happstack m) => UserPassId -> RouteT AuthURL m Response
-        handleLogin userPassId =
+       createURL <- showURL A_CreateAccount
+       e <- eitherHappstackForm (loginForm createURL) "lf"
+       case e of 
+         (Left formHtml) ->
+             do r <- appTemplate "Login" mempty $
+                     H.div ! A.id "happstack-authenticate" $
+                      do h1 "Login"
+                         formToHtml actionURL formHtml
+                ok r
+         (Right userPassId) ->
             do authId <- do authIds <- query' authStateH (UserPassIdAuthIds userPassId) 
                             case Set.size authIds of
                               1 -> return (Just $ head $ Set.toList $ authIds)
@@ -277,24 +296,21 @@ localLoginPage authStateH appTemplate here onAuthURL =
                addAuthCookie authStateH authId (AuthUserPassId userPassId)
                seeOther onAuthURL (toResponse ())
 
-        loginForm :: (Functor v, MonadIO v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] UserPassId
-        loginForm =
-            (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword) <* login) `transform` checkAuth))) <* create
+      where 
+        loginForm createURL =
+            (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> (Text.pack <$> inputText Nothing)) <*> (li $ label "password: " ++> inputPassword) <* login) `transform` checkAuth))) <* (create createURL)
 
-        create :: (Functor v, Monad v, XMLGenerator m, EmbedAsAttr m (Attr String AuthURL)) => Form v [Input] String [XMLGenT m (HSX.XML m)] ()
-        create = view [<p>or <a href=(A_CreateAccount)>create a new account</a></p>]
+        create createURL = viewHtml $ p $ do "or "
+                                             H.a ! href (toValue createURL) $ "create a new account"
+        login = li $ mapHtml (\html -> html ! A.class_  "submit") (submit "Login")
 
-        login :: (Functor v, Monad v, XMLGenerator m) => Form v [Input] String [XMLGenT m (HSX.XML m)] String
-        login = li $ (submit "Login") `setAttrs` [("class" := "submit")]
-
-        checkAuth :: (MonadIO m) => Transformer m String (Text, String) UserPassId
         checkAuth = 
             transformEitherM $ \(username, password) ->
                 do r <- query' authStateH (CheckUserPass username (Text.pack password))
                    case r of 
-                     (Left e) -> return (Left $ userPassErrorString e)
+                     (Left e) -> return (Left $ toHtml $ userPassErrorString e)
                      (Right userPassId) -> return (Right userPassId)
--}
+
 createAccountPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => AcidState AuthState -> (String -> Html -> Html -> m Response) -> String -> AuthURL -> m Response
 createAccountPage authStateH appTemplate onAuthURL here =
     do actionURL <- showURL here
@@ -445,4 +461,4 @@ changePasswordForm authStateH userPass =
                else (Right p1)
 
       changeBtn :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml ()
-      changeBtn = li $ submit "change"
+      changeBtn = li $ mapHtml (\html -> html ! A.class_  "submit") $ submit "change"
