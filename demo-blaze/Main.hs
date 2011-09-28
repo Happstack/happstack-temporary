@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, TypeFamilies, TypeOperators #-}
-{-# OPTIONS_GHC -F -pgmFtrhsx #-}
 -- | NOTE: this must be compiled with -threaded
 module Main where
 
@@ -9,25 +8,19 @@ import Control.Monad                     (liftM, msum, mzero)
 import Control.Monad.Trans               (liftIO)
 import Data.Acid                         (query')
 import Happstack.Server                  ( Response(..), ServerPartT, ServerMonad(..), decodeBody
-                                         , defaultBodyPolicy, dir, nullDir, ok, validateConf
+                                         , defaultBodyPolicy, dir, nullDir, ok, nullConf
                                          , seeOther, setValidatorSP, simpleHTTP, toResponse)
-import Happstack.Server.HSP.HTML         (defaultTemplate)
-import HSP
-import qualified HSX.XMLGenerator as HSX
+import Pages.AppTemplate                 (appTemplate)
 import Pages.Home                        (homePage)
 import Happstack.Auth.Core.Auth          (AskAuthState(..))
 import Happstack.Auth.Core.ProfileURL    (ProfileURL(P_PickProfile))
-import Happstack.Auth.HSP.Login          (handleAuth, handleProfile)
+import Happstack.Auth.Blaze.Templates    (handleAuth, handleProfile)
 import ProfileData                       (ProfileDataURL(CreateNewProfileData), handleProfileData)
 import SiteURL                           (SiteURL(..))
 import System.Environment                (getArgs)
 import System.Exit                       (exitFailure)
 import Web.Routes                        (Site(..), PathInfo(..), RouteT(..), setDefault, showURL, nestURL, parseSegments)
 import Web.Routes.Happstack              (implSite_)
-import Web.Routes.XMLGenT                ()
-
-defaultTemplate' :: (XMLGenerator m, EmbedAsChild m h, EmbedAsChild m b, HSX.XML m ~ XML) => String -> h -> b -> m Response
-defaultTemplate' t h b = liftM toResponse (defaultTemplate t h b)
 
 main :: IO ()
 main = 
@@ -35,7 +28,8 @@ main =
        case args of
          [baseURI] ->
              withAcid Nothing $ \acid ->
-               do tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl acid baseURI)
+               do -- tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl acid baseURI)
+                  tid <- forkIO $ simpleHTTP nullConf (impl acid baseURI)
                   putStrLn "started. Press <enter> to exit."
                   _ <- getLine
                   killThread tid
@@ -92,8 +86,8 @@ handle acid@Acid{..} realm url =
     case url of
       U_HomePage          -> homePage acid
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
-                                nestURL U_Auth $ handleAuth acidAuth defaultTemplate' Nothing realm onAuthURL auth
+                                nestURL U_Auth $ handleAuth acidAuth appTemplate Nothing realm onAuthURL auth
       (U_Profile profile) -> do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
-                                nestURL U_Profile $ handleProfile acidAuth acidProfile defaultTemplate' postPickedURL profile
+                                nestURL U_Profile $ handleProfile acidAuth acidProfile appTemplate postPickedURL profile
       (U_ProfileData profileDataURL) ->
                              do handleProfileData acidAuth acidProfile acidProfileData profileDataURL

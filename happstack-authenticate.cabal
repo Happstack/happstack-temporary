@@ -1,5 +1,5 @@
 Name:                happstack-authenticate
-Version:             0.5.0
+Version:             0.6.0
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
 Homepage:            http://src.seereason.com/happstack-authenticate
@@ -12,12 +12,9 @@ Category:            Web
 Build-type:          Simple
 Cabal-version:       >=1.2
 
-
 Library
 
-  Exposed-modules:     Happstack.Auth.HSP.FormPart, 
-                       Happstack.Auth.HSP.Login,
-                       Happstack.Auth.HSP.AuthProfile,
+  Exposed-modules:     Happstack.Auth.Blaze.Templates
                        Happstack.Auth.Core.Profile, 
                        Happstack.Auth.Core.Auth, 
                        Happstack.Auth.Core.ProfileURL, 
@@ -26,26 +23,22 @@ Library
                        Happstack.Auth.Core.AuthURL
 
   Build-depends:       base > 4 && < 5,
-                       acid-state,
-                       aeson-native,
+                       acid-state == 0.5.*,
+                       aeson-native == 0.3.*,
                        authenticate >= 0.9,
-                       bytestring,
-                       containers,
-                       digestive-functors,
+                       blaze-html == 0.4.*,
+                       bytestring == 0.9.*,
+                       containers == 0.4.*,
+                       digestive-functors == 0.1.*,
                        digestive-functors-happstack >= 0.1,
-                       digestive-functors-hsp >= 0.3.1,
-                       happstack-hsp,
+                       digestive-functors-blaze == 0.1.*,
                        ixset  >= 1.0 && < 1.1,
                        happstack-server >= 6.0 && < 6.3,
-                       safecopy,
-                       hsp,
-                       hsx,
+                       safecopy == 0.5.*,
                        mtl,
-                       pwstore-purehaskell,
+                       pwstore-purehaskell == 2.1.*,
                        QuickCheck >= 2,
-                       safecopy,
-                       text,
-                       time,
-                       web-routes,
-                       web-routes-happstack,
-                       web-routes-hsp
+                       text == 0.11.*,
+                       time >= 1.2 && < 1.5,
+                       web-routes == 0.25.*,
+                       web-routes-happstack == 0.22.*

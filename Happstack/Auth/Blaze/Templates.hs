@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, OverloadedStrings #-}
-module Happstack.Auth.Blaze.Login where
+module Happstack.Auth.Blaze.Templates where
 
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), (*>), optional)
 import Control.Monad              (replicateM, mplus)
@@ -140,7 +140,7 @@ myspacePage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
             -> m Response
 myspacePage appTemplate here authMode =
     do actionURL <- showURL here
-       e <- eitherHappstackForm liveJournalForm "msp"
+       e <- eitherHappstackForm usernameForm "msp"
        case e of
          (Left formHtml) ->
              do r <- appTemplate "Login via Myspace" mempty $

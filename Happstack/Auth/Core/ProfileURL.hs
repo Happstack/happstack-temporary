@@ -7,7 +7,6 @@ import Data.Data
 import Data.Typeable
 import Happstack.Server
 import Web.Routes.Happstack
-import Web.Routes.XMLGenT
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.Profile
 import Test.QuickCheck
