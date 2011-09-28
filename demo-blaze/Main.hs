@@ -4,12 +4,12 @@ module Main where
 
 import Acid                              (Acid(..), withAcid)
 import Control.Concurrent                (forkIO, killThread)
-import Control.Monad                     (liftM, msum, mzero)
+import Control.Monad                     (msum, mzero)
 import Control.Monad.Trans               (liftIO)
 import Data.Acid                         (query')
 import Happstack.Server                  ( Response(..), ServerPartT, ServerMonad(..), decodeBody
                                          , defaultBodyPolicy, dir, nullDir, ok, nullConf
-                                         , seeOther, setValidatorSP, simpleHTTP, toResponse)
+                                         , seeOther, {-setValidatorSP, -} simpleHTTP, toResponse)
 import Pages.AppTemplate                 (appTemplate)
 import Pages.Home                        (homePage)
 import Happstack.Auth.Core.Auth          (AskAuthState(..))

@@ -19,24 +19,17 @@ Executable demo-server
 
  GHC-Options: -threaded -Wall -Wwarn -O2 -rtsopts -fno-warn-name-shadowing -fno-warn-missing-signatures -fwarn-tabs -fno-warn-unused-binds -fno-warn-orphans -fwarn-unused-imports -fno-spec-constr
  Build-depends: acid-state,
+                blaze-html,
                 filepath,
                 happstack-authenticate,
-                happstack-hsp,
                 ixset, 
                 happstack-server, 
-                hsx, 
-                hsp, 
                 mtl, 
                 safecopy,
                 text >= 0.11, 
                 web-routes, 
                 web-routes-happstack, 
-                web-routes-hsp, 
                 web-routes-th
- if !os(windows)
-   -- Cabal has a bug on windows and cannot find trhsx
-   Build-Tools: trhsx
-
  if flag(base4)
     Build-Depends: base >= 4 && < 5, syb
 
