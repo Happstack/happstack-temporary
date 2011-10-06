@@ -26,7 +26,7 @@ Build-Depends: debhelper (>= 7.0),
                libghc-pwstore-purehaskell-prof,
                libghc-safecopy-prof,
                libghc-text-prof,
-               libghc-web-routes-prof,
+               libghc-web-routes-prof (>= 0.26),
                libghc-web-routes-happstack-prof,
                libghc-web-routes-hsp-prof,
                trhsx

@@ -8,13 +8,24 @@ import Happstack.Auth.Core.Profile (ProfileState    , initialProfileState)
 import ProfileData                 (ProfileDataState, initialProfileDataState)
 import System.FilePath             ((</>))
 
+-- | 'Acid' holds all the 'AcidState' handles for this site.
 data Acid = Acid
     { acidAuth        :: AcidState AuthState
     , acidProfile     :: AcidState ProfileState
     , acidProfileData :: AcidState ProfileDataState
     }
 
-withAcid :: Maybe FilePath -> (Acid -> IO a) -> IO a
+-- | run an action which takes 'Acid'.
+--
+-- Uses 'bracket' to open / initialize / close all the 'AcidState' handles. 
+--
+-- WARNING: The database files should only be opened by one thread in
+-- one application at a time. If you want to access the database from
+-- multiple threads (which you almost certainly do), then simply pass
+-- the 'Acid' handle to each thread.
+withAcid :: Maybe FilePath -- ^ state directory
+         -> (Acid -> IO a) -- ^ action
+         -> IO a
 withAcid mBasePath f =
     let basePath = fromMaybe "_state" mBasePath in
     bracket (openAcidStateFrom (basePath </> "auth")        initialAuthState)        (createCheckpointAndClose) $ \auth ->

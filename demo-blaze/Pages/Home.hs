@@ -14,12 +14,14 @@ import Happstack.Auth.Core.AuthURL
 import Happstack.Auth.Core.Profile
 import ProfileData
 import Web.Routes
+import Web.Routes.Happstack        () 
 import Text.Blaze.Html5            as H hiding (fieldset, ol, li, label, head)
 import qualified Text.Blaze.Html5  as H
 import Text.Blaze.Html5.Attributes as A hiding (label)
 
-
-homePage :: Acid -> RouteT SiteURL (ServerPartT IO) Response
+-- | function which generates the homepage
+homePage :: Acid -- ^ database handle
+         -> RouteT SiteURL (ServerPartT IO) Response
 homePage Acid{..} =
     do mUserId <- getUserId acidAuth acidProfile
        case mUserId of

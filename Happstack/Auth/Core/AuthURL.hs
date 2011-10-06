@@ -1,21 +1,12 @@
-{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances, OverloadedStrings #-}
 module Happstack.Auth.Core.AuthURL where
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad
-import Data.Data
-import Data.Typeable
-import Test.QuickCheck
-import Web.Routes
-import Happstack.Server
-import Web.Routes.Happstack
-import Web.Routes
-
--- | move to Web.Routes.Happstack
-seeOtherURL :: (ShowURL m, FilterMonad Response m) => URL m -> m Response
-seeOtherURL url = 
-    do otherURL <- showURL url
-       seeOther otherURL (toResponse "")
+import Control.Monad (msum)
+import Data.Data (Data, Typeable)
+import Data.Text (unpack)
+import Test.QuickCheck (Arbitrary(..), Property, property, oneof)
+import Web.Routes (PathInfo(..), pathInfoInverse_prop, segment)
 
 data OpenIdProvider
     = Google

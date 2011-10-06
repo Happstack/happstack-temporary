@@ -1,4 +1,17 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances, TemplateHaskell, MultiParamTypeClasses, RecordWildCards, TypeFamilies #-}
+-- | The 'ProfileData' module contains application specific data
+-- linked to a specific 'UserId'. This module is in no way required by
+-- the happstack-authenticate library. In general, people do want to
+-- store some sort of profile data, such as the user's name, email
+-- address, etc.
+--
+-- 'happstack-authentication' does not provide any built-in mechanism
+-- for storing that data. Mostly because there is no point. This
+-- module shows how easy it is to create your own mechanism for
+-- storing profile data that does exactly what you want.
+--
+-- If you don't use acid-state for the rest of your application, then
+-- you could just as easily store the data in SQL, etc.
 module ProfileData where
 
 import Control.Monad.Reader
@@ -14,6 +27,7 @@ import Happstack.Auth.Core.Profile
 import Happstack.Server
 import Web.Routes.TH
 
+-- | 'ProfileData' contains application specific 
 data ProfileData = 
     ProfileData { dataFor :: UserId
                 , profileMsg :: Text

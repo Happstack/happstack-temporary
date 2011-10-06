@@ -27,12 +27,12 @@ import Web.Routes
 openIdPage :: (Alternative m, Happstack m) =>
               AcidState AuthState 
            -> AuthMode 
-           -> String 
+           -> Text
            -> m Response
 openIdPage acid LoginMode onAuthURL = 
     do identifier <- getIdentifier
        identifierAddAuthIdsCookie acid identifier
-       seeOther onAuthURL (toResponse ())
+       seeOther (T.unpack onAuthURL) (toResponse ())
 openIdPage acid AddIdentifierMode onAuthURL =
     do identifier <- getIdentifier
        mAuthId    <- getAuthId acid
@@ -40,7 +40,7 @@ openIdPage acid AddIdentifierMode onAuthURL =
          Nothing       -> undefined -- FIXME
          (Just authId) ->
              do update' acid (AddAuthMethod (AuthIdentifier identifier) authId)
-                seeOther onAuthURL (toResponse ())
+                seeOther (T.unpack onAuthURL) (toResponse ())
 
 -- this get's the identifier the openid provider provides. It is our only chance to capture the Identifier. So, before we send a Response we need to have some sort of cookie set that identifies the user. We can not just put the identifier in the cookie because we don't want some one to fake it.
 getIdentifier :: (Happstack m) => m Identifier
@@ -76,32 +76,32 @@ facebookAddAuthIdsCookie acid facebookId =
        return authId
 
 
-connect :: (Happstack m, ShowURL m, URL m ~ OpenIdURL) => 
+connect :: (Happstack m, MonadRoute m, URL m ~ OpenIdURL) => 
               AuthMode     -- ^ authentication mode
-           -> Maybe String -- ^ realm
-           -> String       -- ^ openid url
+           -> Maybe Text -- ^ realm
+           -> Text       -- ^ openid url
            -> m Response
 connect authMode realm url = 
     do openIdUrl <- showURL (O_OpenId authMode)
-       gotoURL <- liftIO $ getForwardUrl (T.pack url) (T.pack openIdUrl) (T.pack <$> realm) []
+       gotoURL <- liftIO $ getForwardUrl url openIdUrl realm []
        seeOther (T.unpack gotoURL) (toResponse gotoURL)
 
 -- type ProviderPage m p = (OpenIdURL p) -> AuthMode -> m Response
 
-handleOpenId :: (Alternative m, Happstack m, ShowURL m, URL m ~ OpenIdURL) =>
+handleOpenId :: (Alternative m, Happstack m, MonadRoute m, URL m ~ OpenIdURL) =>
                 AcidState AuthState
-             -> Maybe String -- ^ realm
-             -> String       -- ^ onAuthURL
+             -> Maybe Text   -- ^ realm
+             -> Text         -- ^ onAuthURL
              -> OpenIdURL    -- ^ this url
              -> m Response
 handleOpenId acid realm onAuthURL url =
     case url of
       (O_OpenId authMode)                  -> openIdPage acid authMode onAuthURL
       (O_Connect authMode)                 -> 
-          do url <- look "url"
-             connect authMode realm url
+          do url <- lookText "url"
+             connect authMode realm (TL.toStrict url)
 
-makeFacebook :: (Monad m, URL m ~ AuthURL, ShowURL m) => 
+makeFacebook :: (Monad m, URL m ~ AuthURL, MonadRoute m) => 
                 Text 
              -> Text
              -> AuthMode
@@ -110,19 +110,19 @@ makeFacebook clientId clientSecret authMode =
     do redirectUri <- showURL (A_FacebookRedirect authMode)
        return (Facebook { facebookClientId     = clientId
                         , facebookClientSecret = clientSecret
-                        , facebookRedirectUri  = T.pack redirectUri 
+                        , facebookRedirectUri  = redirectUri 
                         })
 
-facebookPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) => Facebook -> AuthMode -> m Response
+facebookPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) => Facebook -> AuthMode -> m Response
 facebookPage Facebook{..} authMode = 
     do facebook <- makeFacebook facebookClientId facebookClientSecret authMode
        let url = Facebook.getForwardUrl facebook []
        seeOther (T.unpack url) (toResponse ())
 
-facebookRedirectPage :: (Happstack m, ShowURL m, URL m ~ AuthURL) =>
+facebookRedirectPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                         AcidState AuthState
                      -> Facebook
-                     -> String -- ^ onAuthURL
+                     -> Text -- ^ onAuthURL
                      -> AuthMode
                      -> m Response
 facebookRedirectPage acidAuth Facebook{..} onAuthURL authMode =
@@ -135,12 +135,12 @@ facebookRedirectPage acidAuth Facebook{..} onAuthURL authMode =
              case authMode of
                LoginMode ->
                    do facebookAddAuthIdsCookie acidAuth (FacebookId facebookId)
-                      seeOther onAuthURL (toResponse ())
+                      seeOther (T.unpack onAuthURL) (toResponse ())
                AddIdentifierMode ->
                    do mAuthId <- getAuthId acidAuth
                       case mAuthId of
                         Nothing       -> internalServerError $ toResponse $ "Could not add new authentication method because the user is not logged in."
                         (Just authId) ->
                             do update' acidAuth (AddAuthMethod (AuthFacebook (FacebookId facebookId)) authId)
-                               seeOther onAuthURL (toResponse ())
+                               seeOther (T.unpack onAuthURL) (toResponse ())
          _ -> internalServerError $ toResponse $ "failed to extract user id: " ++ show gd

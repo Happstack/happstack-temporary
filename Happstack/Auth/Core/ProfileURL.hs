@@ -1,15 +1,12 @@
-{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, FlexibleInstances, OverloadedStrings #-}
 module Happstack.Auth.Core.ProfileURL where
 
 import Control.Applicative ((<$>))
-import Control.Monad
-import Data.Data
-import Data.Typeable
-import Happstack.Server
-import Web.Routes.Happstack
-import Happstack.Auth.Core.Auth
-import Happstack.Auth.Core.Profile
-import Test.QuickCheck
+import Control.Monad (msum)
+import Data.Data (Data, Typeable)
+import Happstack.Auth.Core.Auth (AuthId(..))
+import Happstack.Auth.Core.Profile (UserId(..))
+import Test.QuickCheck (Arbitrary(..), Property, arbitrary, property, oneof)
 
 import Web.Routes
 data ProfileURL

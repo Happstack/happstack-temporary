@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.7.0) unstable; urgency=low
+
+  * Updated to web-routes 0.26
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Thu, 06 Oct 2011 16:27:14 -0500
+
 haskell-happstack-authenticate (0.6.0) unstable; urgency=low
 
   * Updated to use blaze-html instead of HSP
