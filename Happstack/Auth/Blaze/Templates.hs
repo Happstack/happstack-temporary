@@ -66,7 +66,7 @@ import Text.Digestive.Forms.Happstack (eitherHappstackForm)
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Authenticate.Facebook  (Facebook)
-import Web.Routes                 (RouteT(..), MonadRoute, askRouteT, showURL, showURLParams, nestURL, URL)
+import Web.Routes                 (RouteT(..), MonadRoute(askRouteFn), showURL, showURLParams, nestURL, URL)
 import Web.Routes.Happstack       (seeOtherURL)
 
 inputString :: (Functor m, Monad m, FormInput i f) => Maybe String -> Form m i e BlazeFormHtml String
@@ -270,7 +270,9 @@ handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
       A_Local           -> localLoginPage authStateH appTemplate url onAuthURL
       A_CreateAccount   -> createAccountPage authStateH appTemplate onAuthURL url
       A_ChangePassword  -> changePasswordPage authStateH appTemplate url
-      (A_OpenId oidURL) -> nestURL A_OpenId $ handleOpenId authStateH realm onAuthURL oidURL
+
+      (A_OpenId oidURL) -> do showFn <- askRouteFn
+                              unRouteT (nestURL A_OpenId $ handleOpenId authStateH realm onAuthURL oidURL) showFn
 
       (A_OpenIdProvider authMode provider) 
                         -> providerPage appTemplate provider url authMode
