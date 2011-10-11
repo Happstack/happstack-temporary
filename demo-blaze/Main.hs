@@ -70,12 +70,6 @@ handle :: Acid         -- ^ database handle
 handle acid@Acid{..} realm url =
     case url of
       U_HomePage          -> do homePage acid
-{-
-      (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
-                                nestURL U_Auth $ handleAuth  acidAuth appTemplate Nothing realm onAuthURL auth
-      (U_Profile profile) -> do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
-                                nestURL U_Profile $ handleProfile acidAuth acidProfile appTemplate postPickedURL profile
--}
       (U_AuthProfile authProfileURL) ->
                              do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
                                 nestURL U_AuthProfile $ handleAuthProfile acidAuth acidProfile appTemplate Nothing realm postPickedURL authProfileURL
