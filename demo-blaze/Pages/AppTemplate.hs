@@ -2,9 +2,9 @@
 module Pages.AppTemplate where
 
 import Happstack.Server            (Response, toResponse)
-import Text.Blaze.Html5            as H hiding (fieldset, ol, li, label, head)
+import           Text.Blaze.Html5  (Html, (!), toHtml)
 import qualified Text.Blaze.Html5  as H
-import Text.Blaze.Html5.Attributes as A hiding (label)
+import qualified Text.Blaze.Html5.Attributes as A
 
 appTemplate' :: 
        String -- ^ title 
@@ -14,7 +14,7 @@ appTemplate' ::
 appTemplate' title headers body = do 
   H.html $ do
     H.head $ do
-      H.meta ! httpEquiv "Content-Type" ! content "text/html; charset=UTF-8"
+      H.meta ! A.httpEquiv "Content-Type" ! A.content "text/html; charset=UTF-8"
       headers
       H.title (toHtml title)
     H.body

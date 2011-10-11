@@ -14,23 +14,23 @@
 -- you could just as easily store the data in SQL, etc.
 module ProfileData where
 
-import Control.Monad.Reader
-import Control.Monad.State
-import Data.Acid
-import Data.Generics
-import           Data.IxSet  (IxSet, (@=), getOne, inferIxSet, noCalcs)
+import Control.Monad.Reader  (ask)
+import Control.Monad.State   (get, put)
+import Data.Acid             (AcidState, Update, Query, makeAcidic, update', query')
+import Data.Generics         (Data, Typeable)
+import           Data.IxSet  ((@=), getOne, inferIxSet, noCalcs)
 import qualified Data.IxSet  as IxSet
-import Data.SafeCopy
-import Data.Text                   (Text)
-import qualified Data.Text         as Text
-import Happstack.Auth.Core.Profile
-import Happstack.Server
-import Web.Routes.TH
+import Data.SafeCopy         (base, deriveSafeCopy)
+import Data.Text             (Text)
+import qualified Data.Text   as Text
+import Happstack.Auth        (AuthState, ProfileState, UserId, getUserId)  
+import Happstack.Server      (Happstack, Response, internalServerError, ok, seeOther, toResponse)
+import Web.Routes.TH         (derivePathInfo)
 
 -- | 'ProfileData' contains application specific 
 data ProfileData = 
-    ProfileData { dataFor :: UserId
-                , profileMsg :: Text
+    ProfileData { dataFor    :: UserId -- ^ UserId associated with this profile data
+                , profileMsg :: Text   -- ^ Some data to store in the profile
                 }
     deriving (Eq, Ord, Read, Show, Typeable, Data)
 $(deriveSafeCopy 1 'base ''ProfileData)
@@ -42,21 +42,22 @@ data ProfileDataState =
     deriving (Eq, Ord, Read, Show, Typeable, Data)
 $(deriveSafeCopy 1 'base ''ProfileDataState)
 
--- FIXME: this should be idempotent
-newProfileData :: UserId -> Text -> Update ProfileDataState ProfileData
-newProfileData uid msg =
+-- | set 'ProfileData' for UserId
+setProfileData :: UserId -> Text -> Update ProfileDataState ProfileData
+setProfileData uid msg =
     do pds@(ProfileDataState {..}) <- get       
        let profileData = ProfileData uid msg
-       put $ pds { profilesData = IxSet.insert profileData profilesData }
+       put $ pds { profilesData = IxSet.updateIx uid profileData profilesData }
        return profileData
 
+-- | get 'ProfileData' associated with 'UserId'
 askProfileData :: UserId -> Query ProfileDataState (Maybe ProfileData)
 askProfileData uid =
     do ProfileDataState{..} <- ask
        return $ getOne $ profilesData @= uid
 
 $(makeAcidic ''ProfileDataState 
-                [ 'newProfileData
+                [ 'setProfileData
                 , 'askProfileData
                 ]
  )
@@ -71,6 +72,12 @@ data ProfileDataURL
 
 $(derivePathInfo ''ProfileDataURL)
 
+handleProfileData :: (Happstack m)
+                  => AcidState AuthState
+                  -> AcidState ProfileState
+                  -> AcidState ProfileDataState
+                  -> ProfileDataURL
+                  -> m Response
 handleProfileData authStateH profileStateH profileDataStateH url =
     case url of
       CreateNewProfileData ->
@@ -78,7 +85,7 @@ handleProfileData authStateH profileStateH profileDataStateH url =
              case mUserId of
                Nothing -> internalServerError $ toResponse $ "not logged in."
                (Just userId) ->
-                   do update' profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
+                   do update' profileDataStateH (SetProfileData userId (Text.pack "this is the default message."))
                       seeOther "/" (toResponse "/")
       (ViewProfileData uid) ->
           do mProfileData <- query' profileDataStateH (AskProfileData uid)

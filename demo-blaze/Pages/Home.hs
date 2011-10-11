@@ -1,23 +1,19 @@
 {-# LANGUAGE RecordWildCards, OverloadedStrings #-}
 module Pages.Home where
 
-import Acid
-import Data.Acid
-import Data.Maybe
+import Acid (Acid(..))
+import Data.Acid (query')
+import Data.Maybe (fromMaybe)
 import Data.Monoid (mempty)
 import qualified Data.Text as Text
-import Happstack.Server
-import Pages.AppTemplate
-import SiteURL
-import Happstack.Auth.Core.Auth    (AuthState)
-import Happstack.Auth.Core.AuthURL
-import Happstack.Auth.Core.AuthProfileURL
-import Happstack.Auth.Core.Profile
-import ProfileData
-import Web.Routes
-import Web.Routes.Happstack        () 
+import Happstack.Server (Response, ServerPartT)
+import Pages.AppTemplate (appTemplate)
+import SiteURL (SiteURL(..))
+import Happstack.Auth (AuthProfileURL(..), AuthURL(..), getUserId)
+import ProfileData (AskProfileData(..), profileMsg)
+import Web.Routes  (RouteT, showURL)
+import Web.Routes.Happstack        ()
 import Text.Blaze.Html5            as H hiding (fieldset, ol, li, label, head)
-import qualified Text.Blaze.Html5  as H
 import Text.Blaze.Html5.Attributes as A hiding (label)
 
 -- | function which generates the homepage
