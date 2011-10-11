@@ -11,6 +11,7 @@ module Happstack.Auth.Blaze.Templates
     ( -- * handlers
       handleAuth
     , handleProfile
+    , handleAuthProfile
       -- * page functions
     , addAuthPage
     , authPicker
@@ -66,7 +67,7 @@ import Text.Digestive.Forms.Happstack (eitherHappstackForm)
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Authenticate.Facebook  (Facebook)
-import Web.Routes                 (RouteT(..), MonadRoute(askRouteFn), showURL, showURLParams, nestURL, URL)
+import Web.Routes                 (RouteT(..), MonadRoute(askRouteFn), showURL, showURLParams, nestURL, liftRouteT, URL)
 import Web.Routes.Happstack       (seeOtherURL)
 
 inputString :: (Functor m, Monad m, FormInput i f) => Maybe String -> Form m i e BlazeFormHtml String
@@ -96,8 +97,8 @@ loginPage mFacebook =
                     H.li $ (a ! href yahooURL       $ "Login") >> " with your Yahoo account"
                     H.li $ (a ! href liveJournalURL $ "Login") >> " with your Live Journal account"
                     H.li $ (a ! href myspaceURL     $ "Login") >> " with your Myspace account"
-                    H.li $ (a ! href myspaceURL     $ "Login") >> " with your OpenId account"
-                    H.li $ (a ! href myspaceURL     $ "Login") >> " with a username and password"
+                    H.li $ (a ! href genericURL     $ "Login") >> " with your OpenId account"
+                    H.li $ (a ! href localURL       $ "Login") >> " with a username and password"
                     case mFacebook of
                       (Just _) -> H.li $ (a ! href facebookURL $ "Login") >> " with your Facebook account"
                       Nothing -> return ()
@@ -116,7 +117,7 @@ addAuthPage mFacebook =
                     H.li $ (a ! href yahooURL       $ "Add") >> " your Yahoo account"
                     H.li $ (a ! href liveJournalURL $ "Add") >> " your Live Journal account"
                     H.li $ (a ! href myspaceURL     $ "Add") >> " your Myspace account"
-                    H.li $ (a ! href myspaceURL     $ "Add") >> " your OpenId account"
+                    H.li $ (a ! href genericURL     $ "Add") >> " your OpenId account"
                     case mFacebook of
                       (Just _) -> H.li $ (a ! href facebookURL $ "Add") >> " your Facebook account"
                       Nothing -> return ()
@@ -336,25 +337,39 @@ handleProfile authStateH profileStateH appTemplate postPickedURL url =
 
 
 -- handleAuthProfile :: (Happstack m, Alternative m, MonadRoute m, URL m ~ AuthProfileURL) =>
-{-
-handleAuthProfile :: forall m. (Happstack m, URL m ~ AuthProfileURL) =>
+
+handleAuthProfile :: forall m. (Happstack m, MonadRoute m, URL m ~ AuthProfileURL) =>
                      AcidState AuthState
                   -> AcidState ProfileState
                   -> (String -> Html -> Html -> m Response)
                   -> Maybe Facebook
-                  -> Maybe String
-                  -> String
+                  -> Maybe Text
+                  -> Text
                   -> AuthProfileURL
                   -> m Response
 handleAuthProfile authStateH profileStateH appTemplate mFacebook mRealm postPickedURL url =
+    do routeFn <- askRouteFn
+       unRouteT (handleAuthProfileRouteT authStateH profileStateH appTemplate mFacebook mRealm postPickedURL url) routeFn
+
+handleAuthProfileRouteT :: forall m. (Happstack m, MonadRoute m, URL m ~ AuthProfileURL) =>
+                     AcidState AuthState
+                  -> AcidState ProfileState
+                  -> (String -> Html -> Html -> m Response)
+                  -> Maybe Facebook
+                  -> Maybe Text
+                  -> Text
+                  -> AuthProfileURL
+                  -> RouteT AuthProfileURL m Response
+handleAuthProfileRouteT authStateH profileStateH appTemplate mFacebook mRealm postPickedURL url =
     case url of
       (AuthURL authURL) -> 
           do onAuthURL <- showURL (ProfileURL P_PickProfile)
-             nestURL AuthURL $ handleAuth authStateH appTemplate mFacebook mRealm "" authURL
-
+             let template t h b = liftRouteT (appTemplate t h b)
+             nestURL AuthURL $ handleAuth authStateH template mFacebook mRealm onAuthURL authURL
       (ProfileURL profileURL) ->
-          do nestURL ProfileURL $ handleProfile authStateH profileStateH appTemplate postPickedURL profileURL
--}
+          do let template t h b = liftRouteT (appTemplate t h b)
+             nestURL ProfileURL $ handleProfile authStateH profileStateH template postPickedURL profileURL
+
 localLoginPage authStateH appTemplate here onAuthURL =
     do actionURL <- showURL here
        createURL <- showURL A_CreateAccount

@@ -16,7 +16,7 @@ import Pages.AppTemplate                 (appTemplate)
 import Pages.Home                        (homePage)
 import Happstack.Auth.Core.Auth          (AskAuthState(..))
 import Happstack.Auth.Core.ProfileURL    (ProfileURL(P_PickProfile))
-import Happstack.Auth.Blaze.Templates    (handleAuth, handleProfile)
+import Happstack.Auth.Blaze.Templates    (handleAuth, handleProfile, handleAuthProfile)
 import ProfileData                       (ProfileDataURL(CreateNewProfileData), handleProfileData)
 import SiteURL                           (SiteURL(..))
 import System.Environment                (getArgs)
@@ -44,7 +44,7 @@ impl acid baseURI = do
     decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
     rq <- askRq
     liftIO $ print rq
-    msum [ do r <- implSite_ baseURI (Text.pack "web/") (spec acid (Just baseURI))
+    msum [ do r <- implSite_ baseURI (Text.pack "web") (spec acid (Just baseURI))
               case r of
                 (Left e) -> liftIO (print e) >> mzero
                 (Right r) -> return r
@@ -70,9 +70,14 @@ handle :: Acid         -- ^ database handle
 handle acid@Acid{..} realm url =
     case url of
       U_HomePage          -> do homePage acid
+{-
       (U_Auth auth)       -> do onAuthURL <- showURL (U_Profile P_PickProfile)
                                 nestURL U_Auth $ handleAuth  acidAuth appTemplate Nothing realm onAuthURL auth
       (U_Profile profile) -> do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
                                 nestURL U_Profile $ handleProfile acidAuth acidProfile appTemplate postPickedURL profile
+-}
+      (U_AuthProfile authProfileURL) ->
+                             do postPickedURL <- showURL (U_ProfileData CreateNewProfileData)
+                                nestURL U_AuthProfile $ handleAuthProfile acidAuth acidProfile appTemplate Nothing realm postPickedURL authProfileURL
       (U_ProfileData profileDataURL) ->
                              do handleProfileData acidAuth acidProfile acidProfileData profileDataURL

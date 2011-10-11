@@ -11,6 +11,7 @@ import Pages.AppTemplate
 import SiteURL
 import Happstack.Auth.Core.Auth    (AuthState)
 import Happstack.Auth.Core.AuthURL
+import Happstack.Auth.Core.AuthProfileURL
 import Happstack.Auth.Core.Profile
 import ProfileData
 import Web.Routes
@@ -26,14 +27,14 @@ homePage Acid{..} =
     do mUserId <- getUserId acidAuth acidProfile
        case mUserId of
          Nothing -> 
-             do loginURL <- showURL (U_Auth A_Login)
+             do loginURL <- showURL (U_AuthProfile $ AuthURL A_Login)
                 appTemplate "not logged in." mempty $
                   H.div $ p  $ do "You can login "
                                   H.a ! href (toValue loginURL) $ "here."
          (Just uid) -> do 
              mpd <- query' acidProfileData (AskProfileData uid)
-             logoutURL  <- showURL (U_Auth A_Logout)
-             addAuthURL <- showURL (U_Auth A_AddAuth)
+             logoutURL  <- showURL (U_AuthProfile $ AuthURL A_Logout)
+             addAuthURL <- showURL (U_AuthProfile $ AuthURL A_AddAuth)
              appTemplate "logged in." mempty $
                H.div $ do
                  H.p $ "You are logged in as" >> toHtml (show uid)

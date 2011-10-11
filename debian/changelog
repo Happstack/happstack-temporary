@@ -1,3 +1,11 @@
+haskell-happstack-authenticate (0.7.1) unstable; urgency=low
+
+  * Added handleAuthProfile
+  * Fixed issue with some login links incorrectly go to myspace page
+  * Fixed issue with missing redirect after authentication
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Tue, 11 Oct 2011 13:18:05 -0500
+
 haskell-happstack-authenticate (0.7.0) unstable; urgency=low
 
   * Updated to web-routes 0.26

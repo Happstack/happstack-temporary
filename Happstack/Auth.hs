@@ -3,6 +3,7 @@ module Happstack.Auth
     , getUserId
     , handleAuth
     , handleProfile
+    , handleAuthProfile
     ) where
 
 import Happstack.Auth.Core.Profile    (UserId(..), getUserId)
