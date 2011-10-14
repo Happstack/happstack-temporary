@@ -62,7 +62,7 @@ import Text.Blaze.Html5.Attributes as A hiding (label)
 import Text.Digestive             ( Form, Transformer, Validator, (++>), (<++), check, mapView
                                   , transform, transformEither, transformEitherM, validate)
 import Text.Digestive.Forms       (FormInput)
-import Text.Digestive.Blaze.Html5 (BlazeFormHtml, FormHtml(..), errors, inputPassword, inputText, label, renderFormHtml, submit, viewHtml)
+import Text.Digestive.Blaze.Html5 (BlazeFormHtml, FormHtml(..), errors, inputPassword, inputPassword', inputText, inputText', label, renderFormHtml, submit, viewHtml)
 import Text.Digestive.Forms.Happstack (eitherHappstackForm)
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
@@ -399,7 +399,7 @@ localLoginPage authStateH appTemplate here onAuthURL =
 
         checkAuth = 
             transformEitherM $ \(username, password) ->
-                do r <- query' authStateH (CheckUserPass username (Text.pack password))
+                do r <- query' authStateH (CheckUserPass username password)
                    case r of 
                      (Left e) -> return (Left $ toHtml $ userPassErrorString e)
                      (Right userPassId) -> return (Right userPassId)
@@ -427,8 +427,8 @@ newAccountForm authStateH =
     where
       submitButton = li $ (mapHtml (\html -> html ! A.class_  "submit") $ submit "Create Account")
       username  = li $ ((label "username: "         ++> inputText Nothing  <++ errors) `validate` notEmpty)
-      password1 = li $ label "password: "         ++> inputPassword <++ errors
-      password2 = li $ label "confirm password: " ++> inputPassword <++ errors
+      password1 = li $ label "password: "         ++> inputPassword' <++ errors
+      password2 = li $ label "confirm password: " ++> inputPassword' <++ errors
 
       password = 
           (minLengthString 6 $ 
@@ -532,14 +532,14 @@ changePasswordForm authStateH userPass =
           (li $  label "old password: " ++> inputPassword `transform` checkAuth)
       checkAuth =
           transformEitherM $ \password ->
-              do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) (Text.pack password))
+              do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) password)
                  case r of 
                    (Left e)  -> return (Left $ toHtml (userPassErrorString e))
                    (Right _) -> return (Right password)
 
       password1, password2 :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
-      password1 = li $ label "new password: "         ++> inputPassword
-      password2 = li $ label "new confirm password: " ++> inputPassword
+      password1 = li $ label "new password: "         ++> inputPassword'
+      password2 = li $ label "new confirm password: " ++> inputPassword'
 
       newPassword :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
       newPassword = 

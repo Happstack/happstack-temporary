@@ -33,7 +33,7 @@ Library
                        containers == 0.4.*,
                        digestive-functors == 0.1.*,
                        digestive-functors-happstack >= 0.1,
-                       digestive-functors-blaze == 0.1.*,
+                       digestive-functors-blaze == 0.2.*,
                        ixset  >= 1.0 && < 1.1,
                        happstack-server >= 6.0 && < 6.3,
                        safecopy == 0.5.*,
