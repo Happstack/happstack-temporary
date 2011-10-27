@@ -391,7 +391,7 @@ localLoginPage authStateH appTemplate here onAuthURL =
 
       where 
         loginForm createURL =
-            (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword) <* login) `transform` checkAuth))) <* (create createURL)
+            (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword True) <* login) `transform` checkAuth))) <* (create createURL)
 
         create createURL = viewHtml $ p $ do "or "
                                              H.a ! href (toValue createURL) $ "create a new account"
@@ -427,8 +427,8 @@ newAccountForm authStateH =
     where
       submitButton = li $ (mapHtml (\html -> html ! A.class_  "submit") $ submit "Create Account")
       username  = li $ ((label "username: "         ++> inputText Nothing  <++ errors) `validate` notEmpty)
-      password1 = li $ label "password: "         ++> inputPassword' <++ errors
-      password2 = li $ label "confirm password: " ++> inputPassword' <++ errors
+      password1 = li $ label "password: "         ++> inputPassword' True <++ errors
+      password2 = li $ label "confirm password: " ++> inputPassword' True <++ errors
 
       password = 
           (minLengthString 6 $ 
@@ -529,7 +529,7 @@ changePasswordForm authStateH userPass =
       -- form elements
       oldPassword = 
           errors ++>
-          (li $  label "old password: " ++> inputPassword `transform` checkAuth)
+          (li $  label "old password: " ++> inputPassword True `transform` checkAuth)
       checkAuth =
           transformEitherM $ \password ->
               do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) password)
@@ -538,8 +538,8 @@ changePasswordForm authStateH userPass =
                    (Right _) -> return (Right password)
 
       password1, password2 :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
-      password1 = li $ label "new password: "         ++> inputPassword'
-      password2 = li $ label "new confirm password: " ++> inputPassword'
+      password1 = li $ label "new password: "         ++> inputPassword' True
+      password2 = li $ label "new confirm password: " ++> inputPassword' True
 
       newPassword :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
       newPassword = 
