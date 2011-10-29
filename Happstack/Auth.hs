@@ -6,6 +6,7 @@ module Happstack.Auth
     , AuthURL(..)
     , ProfileURL(..)
     , getUserId
+    , authProfileHandler
     , handleAuth
     , handleProfile
     , handleAuthProfile
@@ -17,4 +18,4 @@ import Happstack.Auth.Core.AuthURL    (AuthURL(..))
 import Happstack.Auth.Core.Profile    (ProfileState(..))
 import Happstack.Auth.Core.ProfileURL (ProfileURL(..))
 import Happstack.Auth.Core.AuthProfileURL (AuthProfileURL(..))
-import Happstack.Auth.Blaze.Templates (handleAuth, handleProfile, handleAuthProfile)
+import Happstack.Auth.Blaze.Templates (authProfileHandler, handleAuth, handleProfile, handleAuthProfile)

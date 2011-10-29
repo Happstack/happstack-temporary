@@ -15,10 +15,13 @@ import Happstack.Server                  ( Response(..), ServerPartT, decodeBody
 import Pages.AppTemplate                 (appTemplate)
 import Pages.Home                        (homePage)
 import Happstack.Auth.Core.Auth          (AskAuthState(..))
-import Happstack.Auth.Blaze.Templates    (handleAuthProfile, authProfileHandler)
-import ProfileData                       (handleProfileData)
+import Happstack.Auth.Blaze.Templates    (handleAuthProfile)
+import ProfileData                       (ProfileDataURL(CreateNewProfileData), handleProfileData)
+import SiteURL                           (SiteURL(..))
 import System.Environment                (getArgs)
 import System.Exit                       (exitFailure)
+import Web.Routes                        (Site(..), PathInfo(..), RouteT(..), setDefault, showURL, nestURL, parseSegments)
+import Web.Routes.Happstack              (implSite_)
 
 main :: IO ()
 main = 
@@ -38,15 +41,25 @@ main =
 route :: Acid -- ^ database handle
       -> Text -- ^ base uri
       -> ServerPartT IO Response
-route acid@Acid{..} baseURI = do
+route acid baseURI = do
     decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
-    msum [ authProfileHandler baseURI (Text.pack "web") acidAuth acidProfile appTemplate Nothing (Just baseURI) (Text.pack "/profile_data/new")
-         , handleProfileData acidAuth acidProfile acidProfileData
-         , dir "dump_auth" $ do authState <- query' acidAuth AskAuthState 
+    msum [ -- this is the handler that actually deals with authentication / profiles.
+           --
+           -- If you do not wish to use web-routes in the rest of your
+           -- application, you could just call the
+           -- happstack-authenticate functions like this, and add the
+           -- rest of your handlers the normal way.
+           do e <- implSite_ baseURI (Text.pack "web") (spec acid (Just baseURI))
+              case e of
+                (Left err) -> liftIO (print err) >> mzero
+                (Right resp) -> return resp
+           -- a little debug handler which dumps the auth information.
+           -- clearly not good for a real app
+         , dir "dump_auth" $ do authState <- query' (acidAuth acid) AskAuthState 
                                 ok $ toResponse (show authState)
-         , nullDir >> homePage acid
+         , nullDir >> seeOther "/web/" (toResponse "")
          ]
-{-
+
 -- | route 'SiteURL' to the appropriate handlers
 routeSiteURL :: Acid         -- ^ database handle
              -> Maybe Text -- ^ authentication realm
@@ -70,4 +83,3 @@ spec acid realm =
            , formatPathSegments  = \u -> (toPathSegments u, [])
            , parsePathSegments   = parseSegments fromPathSegments
            }
--}

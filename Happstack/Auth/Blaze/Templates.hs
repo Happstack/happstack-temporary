@@ -12,6 +12,7 @@ module Happstack.Auth.Blaze.Templates
       handleAuth
     , handleProfile
     , handleAuthProfile
+    , authProfileHandler
       -- * page functions
     , addAuthPage
     , authPicker
@@ -38,7 +39,7 @@ module Happstack.Auth.Blaze.Templates
     ) where
 
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), (*>), optional)
-import Control.Monad              (replicateM, mplus)
+import Control.Monad              (replicateM, mplus, mzero)
 import Control.Monad.Trans        (MonadIO(liftIO))
 import Data.Acid                  (AcidState, query', update')
 import Data.Maybe                 (mapMaybe)
@@ -67,8 +68,8 @@ import Text.Digestive.Forms.Happstack (eitherHappstackForm)
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Authenticate.Facebook  (Facebook)
-import Web.Routes                 (RouteT(..), MonadRoute(askRouteFn), showURL, showURLParams, nestURL, liftRouteT, URL)
-import Web.Routes.Happstack       (seeOtherURL)
+import Web.Routes                 (RouteT(..), Site(..), PathInfo(..), MonadRoute(askRouteFn), parseSegments, showURL, showURLParams, nestURL, liftRouteT, URL)
+import Web.Routes.Happstack       (implSite_, seeOtherURL)
 
 inputString :: (Functor m, Monad m, FormInput i f) => Maybe String -> Form m i e BlazeFormHtml String
 inputString s = Text.unpack <$> inputText (Text.pack <$> s)
@@ -338,6 +339,36 @@ handleProfile authStateH profileStateH appTemplate postPickedURL url =
 
 -- handleAuthProfile :: (Happstack m, Alternative m, MonadRoute m, URL m ~ AuthProfileURL) =>
 
+authProfileSite :: (Happstack m) =>
+                   AcidState AuthState
+                -> AcidState ProfileState
+                -> (String  -> Html -> Html -> m Response)
+                -> Maybe Facebook
+                -> Maybe Text
+                -> Text
+                -> Site AuthProfileURL (m Response)
+authProfileSite acidAuth acidProfile appTemplate mFacebook realm postPickedURL
+    = Site { handleSite = \f u -> unRouteT (handleAuthProfileRouteT acidAuth acidProfile appTemplate mFacebook realm postPickedURL u) f
+           , formatPathSegments = \u -> (toPathSegments u, [])
+           , parsePathSegments  = parseSegments fromPathSegments
+           }
+
+authProfileHandler :: (Happstack m) =>
+                      Text
+                   -> Text
+                   -> AcidState AuthState
+                   -> AcidState ProfileState
+                   -> (String  -> Html -> Html -> m Response)
+                   -> Maybe Facebook
+                   -> Maybe Text
+                   -> Text
+                   -> m Response
+authProfileHandler baseURI pathPrefix acidAuth acidProfile appTemplate mFacebook realm postPickedURL =
+    do r <- implSite_ baseURI pathPrefix (authProfileSite acidAuth acidProfile appTemplate mFacebook realm postPickedURL)
+       case r of
+         (Left e) -> mzero
+         (Right r) -> return r
+
 handleAuthProfile :: forall m. (Happstack m, MonadRoute m, URL m ~ AuthProfileURL) =>
                      AcidState AuthState
                   -> AcidState ProfileState
@@ -351,7 +382,7 @@ handleAuthProfile authStateH profileStateH appTemplate mFacebook mRealm postPick
     do routeFn <- askRouteFn
        unRouteT (handleAuthProfileRouteT authStateH profileStateH appTemplate mFacebook mRealm postPickedURL url) routeFn
 
-handleAuthProfileRouteT :: forall m. (Happstack m, MonadRoute m, URL m ~ AuthProfileURL) =>
+handleAuthProfileRouteT :: forall m. (Happstack m) =>
                      AcidState AuthState
                   -> AcidState ProfileState
                   -> (String -> Html -> Html -> m Response)

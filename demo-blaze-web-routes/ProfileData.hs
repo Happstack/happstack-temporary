@@ -24,7 +24,8 @@ import Data.SafeCopy         (base, deriveSafeCopy)
 import Data.Text             (Text)
 import qualified Data.Text   as Text
 import Happstack.Auth        (AuthState, ProfileState, UserId, getUserId)  
-import Happstack.Server      (Happstack, Response, dir, internalServerError, ok, seeOther, toResponse)
+import Happstack.Server      (Happstack, Response, internalServerError, ok, seeOther, toResponse)
+import Web.Routes.TH         (derivePathInfo)
 
 -- | 'ProfileData' contains application specific 
 data ProfileData = 
@@ -55,37 +56,37 @@ askProfileData uid =
     do ProfileDataState{..} <- ask
        return $ getOne $ profilesData @= uid
 
--- | create the profile data, but only if it is missing
-newProfileData :: UserId -> Text -> Update ProfileDataState ProfileData
-newProfileData uid msg = 
-    do pds@(ProfileDataState {..}) <- get       
-       case IxSet.getOne (profilesData @= uid) of
-         Nothing -> do let profileData = ProfileData uid msg
-                       put $ pds { profilesData = IxSet.updateIx uid profileData profilesData }
-                       return profileData
-         (Just profileData) -> return profileData
-
 $(makeAcidic ''ProfileDataState 
                 [ 'setProfileData
                 , 'askProfileData
-                , 'newProfileData
                 ]
  )
  
 initialProfileDataState :: ProfileDataState
 initialProfileDataState = ProfileDataState { profilesData = IxSet.empty }
 
+data ProfileDataURL 
+    = CreateNewProfileData 
+    | ViewProfileData UserId
+      deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+$(derivePathInfo ''ProfileDataURL)
+
 handleProfileData :: (Happstack m)
                   => AcidState AuthState
                   -> AcidState ProfileState
                   -> AcidState ProfileDataState
+                  -> ProfileDataURL
                   -> m Response
-handleProfileData authStateH profileStateH profileDataStateH=
-    dir "profile_data" $ 
-      dir "new" $
+handleProfileData authStateH profileStateH profileDataStateH url =
+    case url of
+      CreateNewProfileData ->
           do mUserId <- getUserId authStateH profileStateH
              case mUserId of
                Nothing -> internalServerError $ toResponse $ "not logged in."
                (Just userId) ->
-                   do update' profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
+                   do update' profileDataStateH (SetProfileData userId (Text.pack "this is the default message."))
                       seeOther "/" (toResponse "/")
+      (ViewProfileData uid) ->
+          do mProfileData <- query' profileDataStateH (AskProfileData uid)
+             ok $ toResponse $ show mProfileData

@@ -1,5 +1,5 @@
 Name:                happstack-authenticate
-Version:             0.7.2
+Version:             0.7.3
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
 Homepage:            http://src.seereason.com/happstack-authenticate
