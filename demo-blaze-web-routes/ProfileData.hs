@@ -56,9 +56,21 @@ askProfileData uid =
     do ProfileDataState{..} <- ask
        return $ getOne $ profilesData @= uid
 
+-- | create the profile data, but only if it is missing
+newProfileData :: UserId -> Text -> Update ProfileDataState ProfileData
+newProfileData uid msg = 
+    do pds@(ProfileDataState {..}) <- get       
+       case IxSet.getOne (profilesData @= uid) of
+         Nothing -> do let profileData = ProfileData uid msg
+                       put $ pds { profilesData = IxSet.updateIx uid profileData profilesData }
+                       return profileData
+         (Just profileData) -> return profileData
+
+
 $(makeAcidic ''ProfileDataState 
                 [ 'setProfileData
                 , 'askProfileData
+                , 'newProfileData
                 ]
  )
  
@@ -85,7 +97,7 @@ handleProfileData authStateH profileStateH profileDataStateH url =
              case mUserId of
                Nothing -> internalServerError $ toResponse $ "not logged in."
                (Just userId) ->
-                   do update' profileDataStateH (SetProfileData userId (Text.pack "this is the default message."))
+                   do update' profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
                       seeOther "/" (toResponse "/")
       (ViewProfileData uid) ->
           do mProfileData <- query' profileDataStateH (AskProfileData uid)
