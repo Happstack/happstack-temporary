@@ -5,7 +5,8 @@ module Happstack.Auth.HSP.Login where
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), (*>), optional)
 import Control.Monad              (replicateM, mplus)
 import Control.Monad.Trans        (MonadIO(liftIO))
-import Data.Acid                  (AcidState, query', update')
+import Data.Acid                  (AcidState)
+import Data.Acid.Advanced         (query', update')
 import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
 import qualified Data.Set         as Set

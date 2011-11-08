@@ -52,6 +52,7 @@ import Control.Monad.State  (get, put)
 import Control.Monad.Trans  (MonadIO(..))
 import Crypto.PasswordStore
 import Data.Acid
+import Data.Acid.Advanced (query', update')
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Data (Data, Typeable)

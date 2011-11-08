@@ -8,7 +8,8 @@ module Happstack.Auth.Core.Profile where
 import Control.Applicative 
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Acid           (AcidState, Update, Query, makeAcidic, query', update')
+import Data.Acid           (AcidState, Update, Query, makeAcidic)
+import Data.Acid.Advanced  (query', update')
 import Data.Data
 import           Data.IxSet (IxSet, (@=), inferIxSet, noCalcs)
 import qualified Data.IxSet as IxSet

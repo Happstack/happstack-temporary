@@ -3,7 +3,8 @@ module Happstack.Auth.Core.AuthParts where
 
 import Control.Applicative
 import Control.Monad.Trans
-import Data.Acid                  (AcidState, query', update')
+import Data.Acid                  (AcidState)
+import Data.Acid.Advanced         (query', update')
 import Data.Aeson                 (Value(..))
 import qualified Data.Map         as Map
 import Data.Maybe                 (mapMaybe)

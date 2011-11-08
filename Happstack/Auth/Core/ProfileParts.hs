@@ -1,7 +1,8 @@
 module Happstack.Auth.Core.ProfileParts where
 
 import Control.Applicative (Alternative(..))
-import           Data.Acid (AcidState, update', query')
+import Data.Acid           (AcidState)
+import Data.Acid.Advanced  (update', query')
 import           Data.Set  (Set)
 import qualified Data.Set  as Set
 import Happstack.Server
