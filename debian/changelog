@@ -1,9 +1,3 @@
-haskell-happstack-authenticate (0.7.4) unstable; urgency=low
-
-  * Changed aeson-native back to aeson and see what happens
-
- -- Jeremy Shaw <jeremy@seereason.com>  Sun, 13 Nov 2011 10:27:53 -0600
-
 haskell-happstack-authenticate (0.7.2) unstable; urgency=low
 
   * Export more things from Happstack.Auth
