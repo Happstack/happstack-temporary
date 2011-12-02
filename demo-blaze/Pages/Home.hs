@@ -3,7 +3,7 @@ module Pages.Home where
 
 import Acid (Acid(..))
 import Control.Monad.Trans (liftIO)
-import Data.Acid (query)
+import Data.Acid.Advanced (query')
 import Data.Maybe (fromMaybe)
 import Data.Monoid (mempty)
 import qualified Data.Text as Text
@@ -25,7 +25,7 @@ homePage Acid{..} =
              appTemplate "not logged in." mempty $
                H.div $ H.p $ "You can login " >> (H.a ! href loginURL $ "here.")
          (Just uid) -> do 
-             mpd <- liftIO $ query acidProfileData (AskProfileData uid)
+             mpd <- query' acidProfileData (AskProfileData uid)
              let logoutURL  = "/web/auth/logout"
                  addAuthURL = "/web/auth/add_auth"
              appTemplate "logged in." mempty $

@@ -1,7 +1,8 @@
 module Acid where
 
 import Control.Exception           (bracket)
-import Data.Acid                   (AcidState, openLocalStateFrom, createCheckpoint, closeAcidState)
+import Data.Acid                   (AcidState, createCheckpoint, closeAcidState)
+import Data.Acid.Local             (createCheckpointAndClose, openLocalStateFrom)
 import Data.Maybe                  (fromMaybe)
 import Happstack.Auth.Core.Auth    (AuthState       , initialAuthState)
 import Happstack.Auth.Core.Profile (ProfileState    , initialProfileState)
@@ -32,5 +33,3 @@ withAcid mBasePath f =
     bracket (openLocalStateFrom (basePath </> "profile")     initialProfileState)     (createCheckpointAndClose) $ \profile ->
     bracket (openLocalStateFrom (basePath </> "profileData") initialProfileDataState) (createCheckpointAndClose) $ \profileData ->
         f (Acid auth profile profileData)
-
-createCheckpointAndClose st = createCheckpoint st >> closeAcidState st

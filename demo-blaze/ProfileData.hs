@@ -17,7 +17,8 @@ module ProfileData where
 import Control.Monad.Reader  (ask)
 import Control.Monad.State   (get, put)
 import Control.Monad.Trans   (liftIO)
-import Data.Acid             (AcidState, Update, Query, makeAcidic, update, query)
+import Data.Acid             (AcidState, Update, Query, makeAcidic)
+import Data.Acid.Advanced    (update')
 import Data.Generics         (Data, Typeable)
 import           Data.IxSet  ((@=), getOne, inferIxSet, noCalcs)
 import qualified Data.IxSet  as IxSet
@@ -87,5 +88,5 @@ handleProfileData authStateH profileStateH profileDataStateH=
              case mUserId of
                Nothing -> internalServerError $ toResponse $ "not logged in."
                (Just userId) ->
-                   do liftIO $ update profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
+                   do update' profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
                       seeOther "/" (toResponse "/")
