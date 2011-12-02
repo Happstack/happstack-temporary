@@ -6,7 +6,7 @@ import Control.Monad.Trans
 import Data.Acid                  (AcidState)
 import Data.Acid.Advanced         (query', update')
 import Data.Aeson                 (Value(..))
-import qualified Data.Map         as Map
+import qualified Data.HashMap.Lazy as HashMap
 import Data.Maybe                 (mapMaybe)
 import           Data.Set         (Set)
 import qualified Data.Set         as Set
@@ -132,7 +132,7 @@ facebookRedirectPage acidAuth Facebook{..} onAuthURL authMode =
        token <- liftIO $ getAccessToken facebook (TL.toStrict code)
        gd    <- liftIO $ getGraphData token (T.pack "me")
        case gd of
-         (Right (Object (Map.lookup (T.pack "id") -> (Just (String facebookId))))) ->
+         (Right (Object (HashMap.lookup (T.pack "id") -> (Just (String facebookId))))) ->
              case authMode of
                LoginMode ->
                    do facebookAddAuthIdsCookie acidAuth (FacebookId facebookId)
