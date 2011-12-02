@@ -6,10 +6,10 @@ import Acid                              (Acid(..), withAcid)
 import Control.Concurrent                (forkIO, killThread)
 import Control.Monad                     (msum, mzero)
 import Control.Monad.Trans               (liftIO)
-import Data.Acid                         (query')
+import Data.Acid                         (query)
 import Data.Text                         (Text)
 import qualified Data.Text               as Text
-import Happstack.Server                  ( Response(..), ServerPartT, decodeBody
+import Happstack.Server                  ( Happstack, Response(..), ServerPartT, decodeBody
                                          , defaultBodyPolicy, dir, nullDir, ok, nullConf
                                          , seeOther, simpleHTTP, toResponse)
 import Pages.AppTemplate                 (appTemplate)
@@ -42,7 +42,7 @@ route acid@Acid{..} baseURI = do
     decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
     msum [ authProfileHandler baseURI (Text.pack "web") acidAuth acidProfile appTemplate Nothing (Just baseURI) (Text.pack "/profile_data/new")
          , handleProfileData acidAuth acidProfile acidProfileData
-         , dir "dump_auth" $ do authState <- query' acidAuth AskAuthState 
+         , dir "dump_auth" $ do authState <- liftIO $ query acidAuth AskAuthState 
                                 ok $ toResponse (show authState)
          , nullDir >> homePage acid
          ]

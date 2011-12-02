@@ -16,7 +16,8 @@ module ProfileData where
 
 import Control.Monad.Reader  (ask)
 import Control.Monad.State   (get, put)
-import Data.Acid             (AcidState, Update, Query, makeAcidic, update', query')
+import Control.Monad.Trans   (liftIO)
+import Data.Acid             (AcidState, Update, Query, makeAcidic, update, query)
 import Data.Generics         (Data, Typeable)
 import           Data.IxSet  ((@=), getOne, inferIxSet, noCalcs)
 import qualified Data.IxSet  as IxSet
@@ -24,7 +25,7 @@ import Data.SafeCopy         (base, deriveSafeCopy)
 import Data.Text             (Text)
 import qualified Data.Text   as Text
 import Happstack.Auth        (AuthState, ProfileState, UserId, getUserId)  
-import Happstack.Server      (Happstack, Response, dir, internalServerError, ok, seeOther, toResponse)
+import Happstack.Server      (Happstack, Response, ServerPartT, dir, internalServerError, ok, seeOther, toResponse)
 
 -- | 'ProfileData' contains application specific 
 data ProfileData = 
@@ -75,11 +76,10 @@ $(makeAcidic ''ProfileDataState
 initialProfileDataState :: ProfileDataState
 initialProfileDataState = ProfileDataState { profilesData = IxSet.empty }
 
-handleProfileData :: (Happstack m)
-                  => AcidState AuthState
+handleProfileData :: AcidState AuthState
                   -> AcidState ProfileState
                   -> AcidState ProfileDataState
-                  -> m Response
+                  -> ServerPartT IO Response
 handleProfileData authStateH profileStateH profileDataStateH=
     dir "profile_data" $ 
       dir "new" $
@@ -87,5 +87,5 @@ handleProfileData authStateH profileStateH profileDataStateH=
              case mUserId of
                Nothing -> internalServerError $ toResponse $ "not logged in."
                (Just userId) ->
-                   do update' profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
+                   do liftIO $ update profileDataStateH (NewProfileData userId (Text.pack "this is the default message."))
                       seeOther "/" (toResponse "/")
