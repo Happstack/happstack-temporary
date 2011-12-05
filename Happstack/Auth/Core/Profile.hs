@@ -63,6 +63,13 @@ initialProfileState =
                      , nextUserId  = UserId 1
                      }
 
+-- | Retrieve the entire ProfileState
+-- Warning, this is an admin level function?
+getProfileState :: Query ProfileState ProfileState
+getProfileState =
+    do ps <- ask
+       return ps
+
 genUserId :: Update ProfileState UserId
 genUserId =
     do as@(ProfileState {..}) <- get
@@ -106,6 +113,7 @@ $(makeAcidic ''ProfileState
                 , 'setAuthIdUserId
                 , 'createNewProfile
                 , 'genUserId
+                , 'getProfileState
                 ])
 
 getUserId :: (Alternative m, Happstack m) => AcidState AuthState -> AcidState ProfileState -> m (Maybe UserId)
