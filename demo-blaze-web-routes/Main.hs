@@ -6,7 +6,7 @@ import Acid                              (Acid(..), withAcid)
 import Control.Concurrent                (forkIO, killThread)
 import Control.Monad                     (msum, mzero)
 import Control.Monad.Trans               (liftIO)
-import Data.Acid                         (query')
+import Data.Acid.Advanced                (query')
 import Data.Text                         (Text)
 import qualified Data.Text               as Text
 import Happstack.Server                  ( Response(..), ServerPartT, decodeBody

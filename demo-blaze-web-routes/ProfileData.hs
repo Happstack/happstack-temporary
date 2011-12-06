@@ -16,7 +16,8 @@ module ProfileData where
 
 import Control.Monad.Reader  (ask)
 import Control.Monad.State   (get, put)
-import Data.Acid             (AcidState, Update, Query, makeAcidic, update', query')
+import Data.Acid             (AcidState, Update, Query, makeAcidic)
+import Data.Acid.Advanced    (update', query')
 import Data.Generics         (Data, Typeable)
 import           Data.IxSet  ((@=), getOne, inferIxSet, noCalcs)
 import qualified Data.IxSet  as IxSet

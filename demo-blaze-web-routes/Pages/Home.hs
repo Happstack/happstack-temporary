@@ -2,7 +2,7 @@
 module Pages.Home where
 
 import Acid (Acid(..))
-import Data.Acid (query')
+import Data.Acid.Advanced (query')
 import Data.Maybe (fromMaybe)
 import Data.Monoid (mempty)
 import qualified Data.Text as Text
