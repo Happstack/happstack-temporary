@@ -1,2 +1,2 @@
 #!/bin/sh
-runghc -isrc src/Main.hs
+runghc -isrc -isrc-interactive-only src/Main.hs
