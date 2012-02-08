@@ -1,9 +1,9 @@
-{-# LANGUAGE UndecidableInstances, OverlappingInstances, ScopedTypeVariables, GADTs,
+{-# LANGUAGE CPP, UndecidableInstances, OverlappingInstances, ScopedTypeVariables, GADTs,
     GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
 module Happstack.Data.Serialize
     ( Serialize(..), Version(..), Migrate(..), Mode(..), Contained, contain, extension,
       safeGet, safePut, getSafeGet, getSafePut, serialize, deserialize, collectVersions,
-      Object(objectType), mkObject, deserializeObject, parseObject,
+      Object(objectType), mkObject, deserializeObject, parseObject, showQualifiedTypeRep,
       module Happstack.Data.Proxy
     ) where
 
@@ -31,6 +31,22 @@ import qualified Data.Text.Lazy.Encoding as LT
 import Data.Binary     as B
 import Data.Binary.Put as B
 import Data.Binary.Get as B
+
+#if MIN_VERSION_base(4,4,0)
+-- in base >= 4.4 the Show instance for TypeRep no longer provides a
+-- fully qualified name. But we have old data around that expects the
+-- FQN. So we will recreate the old naming system for newer versions
+-- of base. We could do something better, but happstack-state is
+-- end-of-life anyway.
+import Data.Typeable.Internal
+showQualifiedTypeRep :: TypeRep -> String
+showQualifiedTypeRep tr =
+    let (TypeRep _f con _rep) = tr
+    in tyConModule con ++ "." ++ show tr
+#else
+showQualifiedTypeRep :: TypeRep -> String
+showQualifiedTypeRep tr = show tr
+#endif
 
 --------------------------------------------------------------
 -- Core types
@@ -119,7 +135,7 @@ safeGetVersioned wantedVersion mbPrevious storedVersion
                          Versioned wantedVersion' mbPrevious'
                              -> do old <- safeGetVersioned wantedVersion' mbPrevious' storedVersion :: B.Get f
                                    return $ migrate old
-    where tStr = show (typeOf (error "huh?" :: b))
+    where tStr = showQualifiedTypeRep (typeOf (error "huh?" :: b))
 
 -- | Compares the numeric value of the versions
 compareVersions :: VersionId a -> VersionId b -> Ordering
@@ -142,7 +158,7 @@ collectVersions prox
         Primitive                          -> [thisType]
         Versioned _ Nothing                -> [thisType]
         Versioned _ (Just (Previous prev)) -> thisType : (collectVersions prev)
-    where thisType = (L.pack . show . typeOf . unProxy) prox
+    where thisType = (L.pack . showQualifiedTypeRep . typeOf . unProxy) prox
 
 --------------------------------------------------------------
 -- Instances
@@ -365,14 +381,14 @@ deserializeObject = deserialize
 parseObject :: Serialize a => Object -> a
 parseObject (Object objType objData)
     = let res = runGet safeGet objData
-          resType = show (typeOf res)
+          resType = showQualifiedTypeRep (typeOf res)
       in if objType /= resType
          then error $ "Failed to parse object of type '" ++ objType ++ "'. Expected type '" ++ resType ++ "'"
          else res
 
 -- | Serializes data and stores it along with its type name in an Object
 mkObject :: Serialize a => a -> Object
-mkObject obj = Object { objectType = show (typeOf obj)
+mkObject obj = Object { objectType = showQualifiedTypeRep (typeOf obj)
                       , objectData = serialize obj }
 
 -- | Uniform container for any serialized data.  It contains a string rep of the type

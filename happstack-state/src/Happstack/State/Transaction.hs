@@ -124,7 +124,7 @@ emitEvent' eventType ev
            EmitInternal eventMap -> emitFunc eventMap eventType ev
 
 emitEvent :: (Serialize ev, Typeable res) => ev -> IO res
-emitEvent ev = emitEvent' (show (typeOf ev)) ev
+emitEvent ev = emitEvent' (showQualifiedTypeRep (typeOf ev)) ev
 
 setNewEventMap :: EventMap -> IO ()
 setNewEventMap eventMap
@@ -213,7 +213,7 @@ extraEvents tx
                  ]
     where t :: TxRun st -> st
           t _ = undefined
-          stateType = show (typeOf (t tx))
+          stateType = showQualifiedTypeRep (typeOf (t tx))
           getStateHandler tx'
               = let fn :: GetCheckpointState -> IO L.ByteString
                     fn ev = do mv <- newEmptyMVar
@@ -374,7 +374,7 @@ lookupEventHandler eventType eventMap
         
 
 eventTString :: Serialize ev => ev -> TypeString
-eventTString ev = show (typeOf ev)
+eventTString ev = showQualifiedTypeRep (typeOf ev)
 
 
 

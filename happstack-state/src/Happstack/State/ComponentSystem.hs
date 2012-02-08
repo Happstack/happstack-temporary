@@ -33,7 +33,7 @@ class (Serialize ev, Serialize res) => UpdateEvent ev res | ev -> res
 class (Serialize ev, Serialize res) => QueryEvent ev res | ev -> res
 
 --------------------------------------------------------------
--- Methods contain the query and update handlers for a component
+-- Methods contain the query and update handl ers for a component
 --------------------------------------------------------------
 
 -- | Method is the actual type that all Updates and Querys eventually
@@ -50,10 +50,10 @@ methodType :: Method t -> String
 methodType m = case m of
                 Update fn -> let ev :: (ev -> Update st res) -> ev
                                  ev _ = undefined
-                             in show (typeOf (ev fn))
+                             in showQualifiedTypeRep (typeOf (ev fn))
                 Query fn  -> let ev :: (ev -> Query st res) -> ev
                                  ev _ = undefined
-                             in show (typeOf (ev fn))
+                             in showQualifiedTypeRep (typeOf (ev fn))
 
 -- | Class for enumerating the set of defined methods by the type of the state.
 -- Instances should not be defined directly, but using 'mkMethods'
@@ -130,7 +130,7 @@ collectHandlers prox
 
 collectHandlers' :: (Methods a, Component a) => Proxy a -> Collect ()
 collectHandlers' prox
-    = let key = show (typeOf (unProxy prox))
+    = let key = showQualifiedTypeRep (typeOf (unProxy prox))
           item = MethodMap $ Map.fromList [ (methodType m, m) | m <- methods prox ]
           versions = collectVersions prox
       in do addItem key item versions (onLoad prox)
