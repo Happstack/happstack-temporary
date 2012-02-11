@@ -6,6 +6,7 @@ cd ../happstack-state   && runhaskell Setup configure --user "$@" && runhaskell 
 cd ../ixset             && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-ixset   && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-server  && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
+cd ../happstack-server-tls  && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack         && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-lite    && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-hsp     && if ghc-pkg field hsp name   > /dev/null 2> /dev/null ; then runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install ; else echo "happstack-hsp skipped because hsp is not installed." ; fi && \

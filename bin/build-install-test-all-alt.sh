@@ -6,6 +6,7 @@ cd ../happstack-state   && runhaskell Setup configure --user -f tests "$@" && ru
 cd ../ixset             && runhaskell Setup configure --user -f tests "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-ixset   && runhaskell Setup configure --user -f tests "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-server  && runhaskell Setup configure --user -f tests "$@" && runhaskell Setup build && runhaskell Setup install && \
+cd ../happstack-server-tls  && runhaskell Setup configure --user "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack         && runhaskell Setup configure --user -f tests "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-lite    && runhaskell Setup configure --user -f tests "$@" && runhaskell Setup build && runhaskell Setup install && \
 cd ../happstack-hstringtemplate && if ghc-pkg field HStringTemplate name   > /dev/null 2> /dev/null ; then runhaskell Setup configure --user -f test "$@" && runhaskell Setup build && runhaskell Setup install ; else echo "happstack-hstringtemplate skipped because HStringTemplate is not installed." ; fi && \

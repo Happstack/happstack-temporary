@@ -6,6 +6,7 @@ cd ../happstack-state   && cabal clean && \
 cd ../ixset             && cabal clean && \
 cd ../happstack-ixset   && cabal clean && \
 cd ../happstack-server  && cabal clean && \
+cd ../happstack-server-tls  && cabal clean && \
 cd ../happstack-hstringtemplate && cabal clean && \
 cd ../happstack-hsp     && cabal clean && \
 cd ../happstack-hamlet  && cabal clean && \

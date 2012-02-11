@@ -44,7 +44,7 @@ sGetContents handle ssl = loop where
 timeoutSocketIO :: TM.Handle -> SSL -> TimeoutIO
 timeoutSocketIO handle ssl =
     TimeoutIO { toHandle      = handle
-              , toShutdown    = SSL.shutdown ssl SSL.Bidirectional
+              , toShutdown    = SSL.shutdown ssl SSL.Unidirectional
               , toPutLazy     = sPutLazyTickle handle ssl
               , toPut         = sPutTickle     handle ssl
               , toGetContents = sGetContents   handle ssl

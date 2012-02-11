@@ -8,6 +8,7 @@ ghc-pkg unregister happstack-plugins --user
 ghc-pkg unregister happstack-wai     --user
 ghc-pkg unregister happstack         --user
 ghc-pkg unregister happstack-server  --user
+ghc-pkg unregister happstack-server-tls  --user
 ghc-pkg unregister happstack-state   --user
 ghc-pkg unregister happstack-ixset   --user
 ghc-pkg unregister ixset             --user
