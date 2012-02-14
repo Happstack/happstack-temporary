@@ -1,5 +1,5 @@
 Name:                happstack
-Version:             6.1.6
+Version:             6.1.7
 Synopsis:            The haskell application server stack + code generation
 Description:         The haskell application server stack
 License:             BSD3
@@ -10,44 +10,6 @@ homepage:            http://happstack.com
 Category:            Web, Distributed Computing
 Build-Type:          Simple
 Cabal-Version:       >= 1.6
-
-data-files:          CHANGELOG
-                     CREDITS
-                     RELEASE_NOTES
-                     templates/project/COPYING
-                     templates/project/bin/run.bat
-                     templates/project/bin/run-interactive.bat
-                     templates/project/bin/build.sh
-                     templates/project/bin/run-interactive.sh
-                     templates/project/bin/run.sh
-                     templates/project/bin/build.bat
-                     templates/project/Setup.hs
-                     templates/project/templates/readme.st
-                     templates/project/guestbook.cabal
-                     templates/project/src/Pages/PostEntry.hs
-                     templates/project/src/Pages/AppTemplate.hs
-                     templates/project/src/Pages/Readme.hs
-                     templates/project/src/Pages/Common.hs
-                     templates/project/src/Pages/GuestBookEntries.hs
-                     templates/project/src/State/GuestBook.hs
-                     templates/project/src/Types/GuestBook.hs
-                     templates/project/src/State.hs
-                     templates/project/src/Main.hs
-                     templates/project/src/Routes.hs
-                     templates/project/src/Pages.hs
-                     templates/project/src/Logger.hs
-                     templates/project/public/theme/images/menu_hover.gif
-                     templates/project/public/theme/images/grunge.gif
-                     templates/project/public/theme/images/entrymeta.gif
-                     templates/project/public/theme/images/date.gif
-                     templates/project/public/theme/images/logo.gif
-                     templates/project/public/theme/images/peel.gif
-                     templates/project/public/theme/images/menu_hili.gif
-                     templates/project/public/theme/images/ql_rss.gif
-                     templates/project/public/theme/images/blockquote.gif
-                     templates/project/public/theme/images/header_loop.gif
-                     templates/project/public/theme/readme.txt
-                     templates/project/public/theme/style.css
 
 source-repository head
     type:     darcs
@@ -87,15 +49,6 @@ Library
      ghc-options:      -Wall -fno-warn-unused-do-bind
   else
      ghc-options:      -Wall
-
-Executable happstack
-  ghc-options: -threaded
-  build-depends:       directory >= 1,
-                       filepath >= 1
-                       
-  hs-source-dirs:      commands
-  main-is:             happstack.hs
-
 
 Executable happstack-tests
   Main-Is: Test.hs

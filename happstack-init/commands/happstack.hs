@@ -2,7 +2,7 @@
 module Main (main) where
 
 import Control.Monad (filterM, liftM, mapM, mapM_)
-import Paths_happstack (getDataDir)
+import Paths_happstack_init (getDataDir)
 import System.Environment (getArgs)
 import System.Directory
     ( canonicalizePath
