@@ -1,5 +1,5 @@
 Name:                happstack
-Version:             6.0.6
+Version:             6.1.6
 Synopsis:            The haskell application server stack + code generation
 Description:         The haskell application server stack
 License:             BSD3
@@ -62,7 +62,6 @@ Flag tests
     Default: False
 
 Library
-  exposed-modules:     Happstack.State.ClockTime                       
   if flag(tests)
     Exposed-modules:   Happstack.Tests
   other-modules:       Paths_happstack
@@ -72,9 +71,7 @@ Library
                        happstack-ixset  >= 6.0 && < 6.2,
                        happstack-server >= 6.0 && < 6.6,
                        happstack-state  >= 6.0 && < 6.2,
-                       happstack-util   >= 6.0 && < 6.1,
-                       old-time
-
+                       happstack-util   >= 6.0 && < 6.1
                        
   if flag(base4)
     Build-Depends:     base >= 4 && < 5, syb

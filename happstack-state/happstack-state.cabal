@@ -1,5 +1,5 @@
 Name:                happstack-state
-Version:             6.1.3
+Version:             6.1.4
 Synopsis:            Event-based distributed state.
 Description:         Unplug your machine and restart and have your app recover to exactly where it left off. Happstack-State spares you the need to deal with all the marshalling, consistency, and configuration headache that you would have if you used an external DBMS for this purpose. Its component model makes it easy to compose big applications from smaller reliable parts. Use event subscription to trigger IO actions and support comet-style or irc-bot applications. 
 License:             BSD3
@@ -32,6 +32,7 @@ Library
                        Happstack.State
 --                     Happstack.State.Logger
                        Happstack.State.Saver
+                       Happstack.State.ClockTime
                        Happstack.State.Control
                        Happstack.State.Transaction
                        Happstack.State.ComponentTH
