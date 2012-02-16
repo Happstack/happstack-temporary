@@ -35,7 +35,7 @@ Library
                        happstack-state  >= 6.0 && < 6.2,
                        happstack-util   >= 6.0 && < 6.1
                        
-  hs-source-dirs:      src
+
   if flag(tests)
     hs-source-dirs:    tests
 
@@ -47,7 +47,7 @@ Library
 Executable happstack-tests
   Main-Is: Test.hs
   GHC-Options: -threaded
-  hs-source-dirs: tests, src
+  hs-source-dirs: tests
   if flag(tests)
     Buildable: True
     Build-depends: HUnit
