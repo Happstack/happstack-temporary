@@ -333,7 +333,7 @@ handleProfile authStateH profileStateH appTemplate postPickedURL url =
               else do resp <-  appTemplate "Unauthorized" mempty $
                                  H.div ! A.id "happstack-authenticate" $
                                    p $ do " Attempted to set AuthId to "
-                                          toHtml $show $ unAuthId authId
+                                          toHtml $ show $ unAuthId authId
                                           ", but failed because the Identifier is not associated with that AuthId."
                       unauthorized resp
 

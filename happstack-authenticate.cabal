@@ -35,7 +35,7 @@ Library
                        digestive-functors-happstack >= 0.1,
                        digestive-functors-blaze == 0.2.*,
                        ixset  >= 1.0 && < 1.1,
-                       happstack-server >= 6.0 && < 6.6,
+                       happstack-server >= 6.0 && < 6.7,
                        safecopy == 0.6.*,
                        mtl,
                        pwstore-purehaskell == 2.1.*,
