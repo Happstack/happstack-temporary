@@ -1,3 +1,9 @@
+haskell-happstack-authenticate (0.7.5) unstable; urgency=low
+
+  * Allow web-routes 0.27.*
+
+ -- Jeremy Shaw <jeremy@seereason.com>  Tue, 21 Feb 2012 16:02:08 -0600
+
 haskell-happstack-authenticate (0.7.4) unstable; urgency=low
 
   * Updated to aeson 0.4.*
