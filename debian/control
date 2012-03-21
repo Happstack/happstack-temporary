@@ -30,7 +30,7 @@ Build-Depends: debhelper (>= 7.0),
                libghc-web-routes-prof (>= 0.26),
                libghc-web-routes-happstack-prof,
                libghc-web-routes-hsp-prof,
-               trhsx
+               haskell-hsx-utils
 Build-Depends-Indep: ghc-doc,
                      haddock,
                      libghc-quickcheck2-doc,
