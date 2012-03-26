@@ -28,7 +28,7 @@ import Control.Monad.Trans             (lift)
 import Control.Monad.State             (MonadState(get,put))
 import HSX.XMLGenerator                (XMLGenerator(..), XMLGen(..), EmbedAsChild(..), EmbedAsAttr(..), IsName(..), Attr(..), Name)
 import Language.Javascript.JMacro      (JStat(..), jsToDoc, jsSaturate, renderPrefixJs)
-import Text.PrettyPrint.HughesPJ       (Style(..), Mode(..), render, renderStyle, style)
+import Text.PrettyPrint.HughesPJ       (Style(..), Mode(..), renderStyle, style)
 
 class IntegerSupply m where 
     nextInteger :: m Integer
@@ -51,7 +51,9 @@ instance (XMLGenerator m, IntegerSupply m) => EmbedAsChild m JStat where
       do i <- lift nextInteger
          asChild $ genElement (Nothing, "script")
                     [asAttr ("type" := "text/javascript")]
-                    [asChild (render $ renderPrefixJs (show i) jstat)]
+                    [asChild (renderStyle lineStyle $ renderPrefixJs (show i) jstat)]
+      where
+        lineStyle = style { mode= OneLineMode }
 
 instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedAsAttr m (Attr n JStat) where
   asAttr (n := jstat) = 
