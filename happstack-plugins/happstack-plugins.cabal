@@ -1,5 +1,5 @@
 Name:                happstack-plugins
-Version:             6.3.2
+Version:             7.0.0
 Synopsis:            The haskell application server stack + reload
 Description:         This library provides support for automatically recompiling and reloading modules into a running server.
 License:             BSD3
@@ -30,8 +30,8 @@ Library
   build-depends:       base             >= 3 && < 5,
                        plugins-auto     == 0.0.*,
                        mtl              == 2.0.*,
-                       happstack-server >= 6,
+                       happstack-server >= 6   && <7.1,
                        template-haskell >= 2.6 && <2.8,
                        th-lift          == 0.5.*
-                       
+
   ghc-options:      -Wall
