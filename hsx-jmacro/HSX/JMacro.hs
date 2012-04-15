@@ -7,7 +7,7 @@
 -- > instance (XMLGenerator m, IntegerSupply m) => EmbedAsChild m JStat
 -- > instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedAsAttr m (Attr n JStat)
 -- > instance ToJExpr XML
--- > instance ToJExpr (Ident XML)
+-- > instance ToJExpr DOMNode
 -- 
 -- In order to ensure that each embedded 'JStat' block has unique
 -- variable names, the monad must supply a source of unique
@@ -30,10 +30,10 @@
 -- > js = do html <- unXMLGenT <p>I'm in a Monad!</p>
 -- >         return [jmacro| document.getElementById("messages").appendChild(`(html)`); |]
 --
--- The @ToJExpr (Ident XML)@ instance allows you to run HSP in the Identity monad via
--- 'Ident' to render JMacro in pure code:
+-- The @ToJExpr DOMNode@ instance allows you to run HSP in the Identity
+-- monad to render JMacro in pure code:
 --
--- > html :: Ident XML
+-- > html :: DOMNode
 -- > html = <p>I'm using <em>JavaScript</em>!</p>
 -- > js = [jmacro| var language = `(html)`.getElementsByTagName("em")[0].textContent; |]
 --
@@ -96,5 +96,10 @@ instance ToJExpr HTML.XML where
                         ; return node.childNodes[0]
                         })() |]
 
-instance ToJExpr (HSP.Ident HTML.XML) where
+-- | Provided for convenience since @Ident@ is exported by both
+-- @HSP.Identity@ and @JMacro@.  Using this you can avoid the need for an
+-- extra and qualified import.
+type DOMNode = HSP.Ident HTML.XML
+
+instance ToJExpr DOMNode where
   toJExpr = toJExpr . HSP.evalIdentity
