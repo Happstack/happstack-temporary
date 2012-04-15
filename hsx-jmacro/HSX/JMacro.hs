@@ -6,6 +6,7 @@
 --
 -- > instance (XMLGenerator m, IntegerSupply m) => EmbedAsChild m JStat
 -- > instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedAsAttr m (Attr n JStat)
+-- > instance ToJExpr XML
 -- > instance ToJExpr (Ident XML)
 -- 
 -- In order to ensure that each embedded 'JStat' block has unique
@@ -23,12 +24,28 @@
 -- > instance IntegerSupply (ServerPartT IO) where
 -- >     nextInteger = fmap (fromIntegral . (`mod` 1024) . hashUnique) (liftIO newUnique)
 --
--- The @ToJExpr@ instance allows you to run HSP in the Identity monad via
--- 'Ident', to generate DOM nodes with JMacro antiquotation:
+-- The @ToJExpr XML@ instance allows you to splice in XML lifted out of an
+-- arbitrary monad to generate DOM nodes with JMacro antiquotation:
+--
+-- > js = do html <- unXMLGenT <p>I'm in a Monad!</p>
+-- >         return [jmacro| document.getElementById("messages").appendChild(`(html)`); |]
+--
+-- The @ToJExpr (Ident XML)@ instance allows you to run HSP in the Identity monad via
+-- 'Ident' to render JMacro in pure code:
 --
 -- > html :: Ident XML
--- > html = <p>This paragraph inserted using <em>JavaScript</em>!</p>
--- > js = [jmacro| document.getElementById("messages").appendChild(`(html)`); |]
+-- > html = <p>I'm using <em>JavaScript</em>!</p>
+-- > js = [jmacro| var language = `(html)`.getElementsByTagName("em")[0].textContent; |]
+--
+-- You can see here that you get an actual DOM tree in JavaScript.  This is
+-- also compatible with libraries such as jQuery and YUI which are able to
+-- wrap DOM nodes in their own type, for example with jQuery:
+--
+-- > js = [jmacro| var languages = $(`(html)`).find("em").text(); |]
+--
+-- Or with YUI:
+--
+-- > js = [jmacro| var languages = Y.Node(`(html)`).one("em").get("text"); |]
 module HSX.JMacro where
 
 import qualified HSP.Identity              as HSP
@@ -72,9 +89,12 @@ instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedA
       where
         lineStyle = style { mode= OneLineMode }
 
-instance ToJExpr (HSP.Ident HTML.XML) where
+instance ToJExpr HTML.XML where
   toJExpr xml =
     [jmacroE| (function { var node = document.createElement('div')
-                        ; node.innerHTML = `(HTML.renderAsHTML . HSP.evalIdentity $ xml)`
+                        ; node.innerHTML = `(HTML.renderAsHTML xml)`
                         ; return node.childNodes[0]
                         })() |]
+
+instance ToJExpr (HSP.Ident HTML.XML) where
+  toJExpr = toJExpr . HSP.evalIdentity
