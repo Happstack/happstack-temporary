@@ -45,7 +45,7 @@
 --
 -- Or with YUI:
 --
--- > js = [jmacro| var languages = Y.Node(`(html)`).one("em").get("text"); |]
+-- > js = [jmacro| var languages = Y.one(`(html)`).one("em").get("text"); |]
 module HSX.JMacro where
 
 import qualified HSP.Identity              as HSP
