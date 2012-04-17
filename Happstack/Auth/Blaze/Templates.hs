@@ -7,7 +7,7 @@
 -- you wish to create your own alternatives to 'handleAuth' \/
 -- 'handleProfile'
 --
-module Happstack.Auth.Blaze.Templates 
+module Happstack.Auth.Blaze.Templates
     ( -- * handlers
       handleAuth
     , handleProfile
@@ -50,6 +50,7 @@ import qualified Data.Set         as Set
 import Data.Text                  (Text)
 import qualified Data.Text        as Text
 import Data.Time.Clock            (getCurrentTime)
+import Facebook                   (Credentials)
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.AuthParts
 import Happstack.Auth.Core.AuthURL
@@ -68,7 +69,6 @@ import Text.Digestive.Blaze.Html5 (BlazeFormHtml, FormHtml(..), errors, inputPas
 import Text.Digestive.Forms.Happstack (eitherHappstackForm)
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
-import Web.Authenticate.Facebook  (Facebook)
 import Web.Routes                 (RouteT(..), Site(..), PathInfo(..), MonadRoute(askRouteFn), parseSegments, showURL, showURLParams, nestURL, liftRouteT, URL)
 import Web.Routes.Happstack       (implSite_, seeOtherURL)
 
@@ -77,14 +77,14 @@ inputString s = Text.unpack <$> inputText (Text.pack <$> s)
 
 logoutPage :: (MonadRoute m, URL m ~ AuthURL, Alternative m, Happstack m) => AcidState AuthState -> m Html
 logoutPage authStateH =
-    do deleteAuthCookie authStateH 
+    do deleteAuthCookie authStateH
        url <- H.toValue <$> showURL A_Login
        return $ H.div ! A.id "happstack-authenticate" $
                    p $ do "You are now logged out. Click "
                           a ! href url $ "here"
                           " to log in again."
 
-loginPage :: (MonadRoute m, URL m ~ AuthURL, Happstack m) => Maybe Facebook -> m Html
+loginPage :: (MonadRoute m, URL m ~ AuthURL, Happstack m) => Maybe Credentials -> m Html
 loginPage mFacebook =
     do googleURL      <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Google)
        yahooURL       <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Yahoo)
@@ -94,7 +94,7 @@ loginPage mFacebook =
        localURL       <- H.toValue <$> showURL A_Local
        facebookURL    <- H.toValue <$> showURL (A_Facebook LoginMode)
        return $ H.div ! A.id "happstack-authenticate" $
-                  H.ol $ do 
+                  H.ol $ do
                     H.li $ (a ! href googleURL      $ "Login") >> " with your Google account"
                     H.li $ (a ! href yahooURL       $ "Login") >> " with your Yahoo account"
                     H.li $ (a ! href liveJournalURL $ "Login") >> " with your Live Journal account"
@@ -105,7 +105,7 @@ loginPage mFacebook =
                       (Just _) -> H.li $ (a ! href facebookURL $ "Login") >> " with your Facebook account"
                       Nothing -> return ()
 
-addAuthPage :: (MonadRoute m, URL m ~ AuthURL, Happstack m) => Maybe Facebook -> m Html
+addAuthPage :: (MonadRoute m, URL m ~ AuthURL, Happstack m) => Maybe Credentials -> m Html
 addAuthPage mFacebook =
     do googleURL      <- H.toValue <$> showURL (A_OpenIdProvider AddIdentifierMode Google)
        yahooURL       <- H.toValue <$> showURL (A_OpenIdProvider AddIdentifierMode Yahoo)
@@ -114,7 +114,7 @@ addAuthPage mFacebook =
        genericURL     <- H.toValue <$> showURL (A_OpenIdProvider AddIdentifierMode Generic)
        facebookURL    <- H.toValue <$> showURL (A_Facebook AddIdentifierMode)
        return $ H.div ! A.id "happstack-authenticate" $
-                  H.ol $ do 
+                  H.ol $ do
                     H.li $ (a ! href googleURL      $ "Add") >> " your Google account"
                     H.li $ (a ! href yahooURL       $ "Add") >> " your Yahoo account"
                     H.li $ (a ! href liveJournalURL $ "Add") >> " your Live Journal account"
@@ -132,10 +132,10 @@ authPicker authIds =
     where
       auth authId =
           do url <- H.toValue <$> showURL (P_SetAuthId authId)
-             return $ H.li $ a ! href url $ (H.toHtml $ show authId) -- FIXME: give a more informative view. 
-      
-personalityPicker :: (MonadRoute m, URL m ~ ProfileURL, Happstack m) => 
-                     Set Profile 
+             return $ H.li $ a ! href url $ (H.toHtml $ show authId) -- FIXME: give a more informative view.
+
+personalityPicker :: (MonadRoute m, URL m ~ ProfileURL, Happstack m) =>
+                     Set Profile
                   -> m Html
 personalityPicker profiles =
     do personalities <- mapM personality (Set.toList profiles)
@@ -164,11 +164,11 @@ googlePage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
               AuthURL
            -> AuthMode
            -> m Response
-googlePage _here authMode = 
+googlePage _here authMode =
     do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ Text.pack google)]
        seeOther (Text.unpack u) (toResponse ())
 
-yahooPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) => 
+yahooPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
              AuthURL
           -> AuthMode
           -> m Response
@@ -177,7 +177,7 @@ yahooPage _here authMode =
        seeOther (Text.unpack u) (toResponse ())
 
 myspacePage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
-               (String -> Html -> Html -> m Response) 
+               (String -> Html -> Html -> m Response)
             -> AuthURL
             -> AuthMode
             -> m Response
@@ -195,9 +195,9 @@ myspacePage appTemplate here authMode =
          (Right username) ->
              do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ Text.pack $ myspace username)]
                 seeOther (Text.unpack u) (toResponse ())
-      where 
+      where
         usernameForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
-        usernameForm = 
+        usernameForm =
             label "http://www.myspace.com/" ++> inputString Nothing <* (mapHtml (\html -> html ! A.class_  "submit") $ submit "Login")
 
 liveJournalPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
@@ -208,7 +208,7 @@ liveJournalPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
 liveJournalPage appTemplate here authMode =
     do actionURL <- showURL here
        e <- eitherHappstackForm liveJournalForm "ljp"
-       case e of 
+       case e of
          (Left formHtml) ->
              do r <- appTemplate "Login via LiveJournal" mempty $
                      H.div ! A.id "happstack-authenticate" $
@@ -221,7 +221,7 @@ liveJournalPage appTemplate here authMode =
                 seeOther (Text.unpack u) (toResponse ())
 
 liveJournalForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
-liveJournalForm = 
+liveJournalForm =
     label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* (mapHtml (\html -> html ! A.class_  "submit") $ submit "Connect")
 
 genericOpenIdPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
@@ -242,9 +242,9 @@ genericOpenIdPage appTemplate here authMode =
          (Right url) ->
              do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just url)]
                 seeOther (Text.unpack u) (toResponse ())
-      where 
+      where
         openIdURLForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml Text
-        openIdURLForm = 
+        openIdURLForm =
             label "Your OpenId url: " ++> inputText Nothing <* submit "Connect"
 
 -- | Function which takes care of all 'AuthURL' routes.
@@ -252,14 +252,14 @@ genericOpenIdPage appTemplate here authMode =
 -- The caller provides a page template function which will be used to
 -- render pages. The provided page template function takes three
 -- arguments:
--- 
+--
 --  >    String -- ^ string to use in the <title> tag
 --  > -> Html   -- ^ extra headers to add to the <head> tag
 --  > -> Html   -- ^ contents to stick in the <body> tag
 handleAuth :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
               AcidState AuthState -- ^ database handle for 'AuthState'
            -> (String -> Html -> Html -> m Response) -- ^ page template function
-           -> Maybe Facebook      -- ^ config information for facebook connect
+           -> Maybe Credentials      -- ^ config information for facebook connect
            -> Maybe Text          -- ^ authentication realm
            -> Text                -- ^ URL to redirect to after succesful authentication
            -> AuthURL             -- ^ url to route
@@ -277,16 +277,16 @@ handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
       (A_OpenId oidURL) -> do showFn <- askRouteFn
                               unRouteT (nestURL A_OpenId $ handleOpenId authStateH realm onAuthURL oidURL) showFn
 
-      (A_OpenIdProvider authMode provider) 
+      (A_OpenIdProvider authMode provider)
                         -> providerPage appTemplate provider url authMode
 
-      (A_Facebook authMode) 
+      (A_Facebook authMode)
                         -> case mFacebook of
                              Nothing -> do resp <- appTemplate "Facebook authentication not configured." mempty $
                                                      H.div ! A.id "happstack-authenticate" $
                                                       p "Facebook authentication not configured."
                                            internalServerError resp
-                             (Just facebook) -> facebookPage facebook authMode 
+                             (Just facebook) -> facebookPage facebook authMode
 
       (A_FacebookRedirect authMode)
                         -> case mFacebook of
@@ -301,7 +301,7 @@ handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
 -- The caller provides a page template function which will be used to
 -- render pages. The provided page template function takes three
 -- arguments:
--- 
+--
 --  >    String -- ^ string to use in the <title> tag
 --  > -> Html   -- ^ extra headers to add to the <head> tag
 --  > -> Html   -- ^ contents to stick in the <body> tag
@@ -314,19 +314,19 @@ handleProfile :: (Happstack m, Alternative m, MonadRoute m, URL m ~ ProfileURL) 
               -> m Response
 handleProfile authStateH profileStateH appTemplate postPickedURL url =
     case url of
-      P_PickProfile        -> 
+      P_PickProfile        ->
           do r <- pickProfile authStateH profileStateH
              case r of
-               (Picked {})                -> 
+               (Picked {})                ->
                    seeOther (Text.unpack postPickedURL) (toResponse postPickedURL)
 
-               (PickPersonality profiles) -> 
+               (PickPersonality profiles) ->
                    appTemplate "Pick Personality" mempty =<< (personalityPicker profiles)
 
                (PickAuthId      authIds)  ->
-                   appTemplate "Pick Auth" mempty =<< (authPicker authIds) 
+                   appTemplate "Pick Auth" mempty =<< (authPicker authIds)
 
-      (P_SetAuthId authId) -> 
+      (P_SetAuthId authId) ->
           do b <- setAuthIdPage authStateH authId
              if b
               then seeOther ("/" :: String) (toResponse ()) -- FIXME: don't hardcode destination
@@ -344,7 +344,7 @@ authProfileSite :: (Happstack m) =>
                    AcidState AuthState
                 -> AcidState ProfileState
                 -> (String  -> Html -> Html -> m Response)
-                -> Maybe Facebook
+                -> Maybe Credentials
                 -> Maybe Text
                 -> Text
                 -> Site AuthProfileURL (m Response)
@@ -360,7 +360,7 @@ authProfileHandler :: (Happstack m) =>
                    -> AcidState AuthState
                    -> AcidState ProfileState
                    -> (String  -> Html -> Html -> m Response)
-                   -> Maybe Facebook
+                   -> Maybe Credentials
                    -> Maybe Text
                    -> Text
                    -> m Response
@@ -374,7 +374,7 @@ handleAuthProfile :: forall m. (Happstack m, MonadRoute m, URL m ~ AuthProfileUR
                      AcidState AuthState
                   -> AcidState ProfileState
                   -> (String -> Html -> Html -> m Response)
-                  -> Maybe Facebook
+                  -> Maybe Credentials
                   -> Maybe Text
                   -> Text
                   -> AuthProfileURL
@@ -387,14 +387,14 @@ handleAuthProfileRouteT :: forall m. (Happstack m) =>
                      AcidState AuthState
                   -> AcidState ProfileState
                   -> (String -> Html -> Html -> m Response)
-                  -> Maybe Facebook
+                  -> Maybe Credentials
                   -> Maybe Text
                   -> Text
                   -> AuthProfileURL
                   -> RouteT AuthProfileURL m Response
 handleAuthProfileRouteT authStateH profileStateH appTemplate mFacebook mRealm postPickedURL url =
     case url of
-      (AuthURL authURL) -> 
+      (AuthURL authURL) ->
           do onAuthURL <- showURL (ProfileURL P_PickProfile)
              let template t h b = liftRouteT (appTemplate t h b)
              nestURL AuthURL $ handleAuth authStateH template mFacebook mRealm onAuthURL authURL
@@ -406,7 +406,7 @@ localLoginPage authStateH appTemplate here onAuthURL =
     do actionURL <- showURL here
        createURL <- showURL A_CreateAccount
        e <- eitherHappstackForm (loginForm createURL) "lf"
-       case e of 
+       case e of
          (Left formHtml) ->
              do r <- appTemplate "Login" mempty $
                      H.div ! A.id "happstack-authenticate" $
@@ -414,14 +414,14 @@ localLoginPage authStateH appTemplate here onAuthURL =
                          formToHtml actionURL formHtml
                 ok r
          (Right userPassId) ->
-            do authId <- do authIds <- query' authStateH (UserPassIdAuthIds userPassId) 
+            do authId <- do authIds <- query' authStateH (UserPassIdAuthIds userPassId)
                             case Set.size authIds of
                               1 -> return (Just $ head $ Set.toList $ authIds)
                               n -> return Nothing
                addAuthCookie authStateH authId (AuthUserPassId userPassId)
                seeOther (Text.unpack onAuthURL) (toResponse ())
 
-      where 
+      where
         loginForm createURL =
             (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword True) <* login) `transform` checkAuth))) <* (create createURL)
 
@@ -429,10 +429,10 @@ localLoginPage authStateH appTemplate here onAuthURL =
                                              H.a ! href (toValue createURL) $ "create a new account"
         login = li $ mapHtml (\html -> html ! A.class_  "submit") (submit "Login")
 
-        checkAuth = 
+        checkAuth =
             transformEitherM $ \(username, password) ->
                 do r <- query' authStateH (CheckUserPass username password)
-                   case r of 
+                   case r of
                      (Left e) -> return (Left $ toHtml $ userPassErrorString e)
                      (Right userPassId) -> return (Right userPassId)
 
@@ -462,24 +462,24 @@ newAccountForm authStateH =
       password1 = li $ label "password: "         ++> inputPassword' True <++ errors
       password2 = li $ label "confirm password: " ++> inputPassword' True <++ errors
 
-      password = 
-          (minLengthString 6 $ 
+      password =
+          (minLengthString 6 $
            (((,) <$> password1 <*> password2) `transform` samePassword))
 
-      samePassword = 
+      samePassword =
           transformEither $ \(p1, p2) ->
               if p1 /= p2
                then (Left $ p "Passwords do not match.")
                else (Right p1)
 
-      createAccount = 
+      createAccount =
           transformEitherM $ \(username, password) ->
               do passHash <- liftIO $ mkHashedPass (Text.pack password)
                  r <- update' authStateH $ CreateUserPass (UserName username) passHash
                  -- fixme: race condition
                  case r of
                    (Left e) -> return (Left $ p $ toHtml (userPassErrorString e))
-                   (Right userPass) -> 
+                   (Right userPass) ->
                        do authId <- update' authStateH (NewAuthMethod (AuthUserPassId (upId userPass)))
                           return (Right (authId, upId userPass))
 
@@ -495,7 +495,7 @@ mapHtml fn = mapView fn'
       fn' (FormHtml encType formHtml) =
           let formHtml' = \formHtmlConfig -> fn (formHtml formHtmlConfig)
           in (FormHtml encType formHtml')
-    
+
 notEmpty :: (Monad m) => Validator m Html Text
 notEmpty = (check $ H.span "field can not be empty") (not . Text.null)
 
@@ -507,19 +507,19 @@ minLengthString n f = errors ++> (f `validate` (check (toHtml $ "This field must
 formToHtml :: Text -> FormHtml Html -> Html
 formToHtml actionURL formHtml =
     let (formHtml', enctype) = renderFormHtml formHtml
-    in H.form ! A.enctype (toValue $ show enctype) 
-              ! A.method "POST" 
+    in H.form ! A.enctype (toValue $ show enctype)
+              ! A.method "POST"
               ! A.action (toValue actionURL) $
              formHtml'
 
 changePasswordPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                       AcidState AuthState -> (String -> Html -> Html -> m Response) -> AuthURL -> m Response
 changePasswordPage authStateH appTemplate here =
-    do actionURL  <- showURL here 
+    do actionURL  <- showURL here
        mAuthToken <- getAuthToken authStateH
        case mAuthToken of
          Nothing -> seeOtherURL A_Login
-         (Just authToken) -> 
+         (Just authToken) ->
              case tokenAuthMethod authToken of
                (AuthUserPassId userPassId) ->
                    do mUserPass <- query' authStateH (AskUserPass userPassId)
@@ -533,9 +533,9 @@ changePasswordPage authStateH appTemplate here =
                             do e <- eitherHappstackForm (changePasswordForm authStateH userPass) "cpf"
                                case e of
                                  (Left formHtml) ->
-                                    do r <- appTemplate "Change Passowrd" mempty $ 
+                                    do r <- appTemplate "Change Passowrd" mempty $
                                                  H.div ! A.id "happstack-authenticate" $
-                                                     do h1 $ do "Change password for " 
+                                                     do h1 $ do "Change password for "
                                                                 toHtml $ unUserName $ upName userPass
                                                                 formToHtml actionURL formHtml
                                        ok r
@@ -543,7 +543,7 @@ changePasswordPage authStateH appTemplate here =
                                     do hashedPass <- liftIO $ mkHashedPass (Text.pack passwd)
                                        r <- update' authStateH (SetPassword userPassId hashedPass)
                                        case r of
-                                         (Just e) -> 
+                                         (Just e) ->
                                              do resp <- appTemplate "Change Password Failed" mempty $
                                                           H.div ! A.id "happstack-authenticate" $
                                                            p $ toHtml (userPassErrorString e)
@@ -559,13 +559,13 @@ changePasswordForm authStateH userPass =
     fieldset $ ol $ oldPassword *> newPassword <* changeBtn
     where
       -- form elements
-      oldPassword = 
+      oldPassword =
           errors ++>
           (li $  label "old password: " ++> inputPassword True `transform` checkAuth)
       checkAuth =
           transformEitherM $ \password ->
               do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) password)
-                 case r of 
+                 case r of
                    (Left e)  -> return (Left $ toHtml (userPassErrorString e))
                    (Right _) -> return (Right password)
 
@@ -574,12 +574,12 @@ changePasswordForm authStateH userPass =
       password2 = li $ label "new confirm password: " ++> inputPassword' True
 
       newPassword :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
-      newPassword = 
-          errors ++> (minLengthString 6 $ 
+      newPassword =
+          errors ++> (minLengthString 6 $
                       ((((,) <$> password1 <*> password2)) `transform` samePassword))
 
       samePassword :: (Monad m) => Transformer m Html (String, String) String
-      samePassword = 
+      samePassword =
           transformEither $ \(p1, p2) ->
               if p1 /= p2
                then (Left $ "Passwords do not match.")
