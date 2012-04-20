@@ -10,7 +10,7 @@ Maintainer:          jeremy@n-heptane.com
 Stability:           Provisional
 Category:            Web
 Build-type:          Simple
-Cabal-version:       >=1.2
+Cabal-version:       >=1.6
 Extra-source-files:  example.hs,
                      example2.hs
 
