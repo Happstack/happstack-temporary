@@ -8,18 +8,18 @@
 -- > instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedAsAttr m (Attr n JStat)
 -- > instance ToJExpr XML
 -- > instance ToJExpr DOMNode
--- 
+--
 -- In order to ensure that each embedded 'JStat' block has unique
 -- variable names, the monad must supply a source of unique
 -- names. This is done by adding an instance of 'IntegerSupply' for
 -- the monad being used with 'XMLGenerator'.
 --
--- For example, an 'IntegerSupply' for 'ServerPartT':
+-- For example, we can use 'StateT' to provide an 'IntegerSupply' instance for 'ServerPartT':
 --
 -- > instance IntegerSupply (ServerPartT (StateT Integer IO)) where
 -- >     nextInteger = nextInteger'
 --
--- This variation avoids the use of an extra monad transformer:
+-- Alternatively, we can exploit the IO monad to provide an 'IntegerSupply' instance for 'ServerPartT':
 --
 -- > instance IntegerSupply (ServerPartT IO) where
 -- >     nextInteger = fmap (fromIntegral . (`mod` 1024) . hashUnique) (liftIO newUnique)
@@ -54,10 +54,13 @@ import qualified Happstack.Server.HSP.HTML as HTML
 import Control.Monad.Trans             (lift)
 import Control.Monad.State             (MonadState(get,put))
 import HSX.XMLGenerator                (XMLGenerator(..), XMLGen(..), EmbedAsChild(..), EmbedAsAttr(..), IsName(..), Attr(..), Name)
-import Language.Javascript.JMacro      (JStat(..), JExpr(..), JVal(..), Ident(..), ToJExpr(..), jmacroE, jLam, jVarTy, jsToDoc, jsSaturate, renderPrefixJs)
+import HSP.XML                         (XML(..), Attribute(..), AttrValue(..))
+import HSP.XML.PCDATA                  (escaper)
+import HSP.HTML                        (htmlEscapeChars)
+import Language.Javascript.JMacro      (JStat(..), JExpr(..), JVal(..), Ident(..), ToJExpr(..), toStat, jmacroE, jLam, jVarTy, jsToDoc, jsSaturate, renderPrefixJs)
 import Text.PrettyPrint.HughesPJ       (Style(..), Mode(..), renderStyle, style)
 
-class IntegerSupply m where 
+class IntegerSupply m where
     nextInteger :: m Integer
 
 -- | This help function allows you to easily create an 'IntegerSupply'
@@ -74,7 +77,7 @@ nextInteger' =
        return i
 
 instance (XMLGenerator m, IntegerSupply m) => EmbedAsChild m JStat where
-  asChild jstat = 
+  asChild jstat =
       do i <- lift nextInteger
          asChild $ genElement (Nothing, "script")
                     [asAttr ("type" := "text/javascript")]
@@ -83,18 +86,54 @@ instance (XMLGenerator m, IntegerSupply m) => EmbedAsChild m JStat where
         lineStyle = style { mode= OneLineMode }
 
 instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedAsAttr m (Attr n JStat) where
-  asAttr (n := jstat) = 
+  asAttr (n := jstat) =
       do i <- lift nextInteger
          asAttr $ (toName n := (renderStyle lineStyle $ renderPrefixJs (show i) jstat))
       where
         lineStyle = style { mode= OneLineMode }
 
-instance ToJExpr HTML.XML where
-  toJExpr xml =
+
+-- | newtype which can be used with 'toJExpr' to specify that the XML
+-- should be converted to a DOM in javascript by using 'innerHTML'
+newtype XMLToInnerHTML = XMLToInnerHTML HTML.XML
+
+instance ToJExpr XMLToInnerHTML where
+  toJExpr (XMLToInnerHTML xml) =
     [jmacroE| (function { var node = document.createElement('div')
                         ; node.innerHTML = `(HTML.renderAsHTML xml)`
                         ; return node.childNodes[0]
                         })() |]
+
+newtype XMLToDOM = XMLToDOM HTML.XML
+
+-- | newtype which can be used with 'toJExpr' to specify that the XML
+-- should be converted to a DOM in javascript by using
+-- @createElement@, @appendChild@, and other DOM functions.
+--
+-- WARNING: does not support XML nodes that contain cdata
+instance ToJExpr XMLToDOM where
+  toJExpr (XMLToDOM (Element (dm, n) attrs children)) =
+      [jmacroE| (function { var node = `(createElement dm n)`;
+                            `(map (setAttribute node) attrs)`;
+                            `(map (appendChild node . XMLToDOM) children)`;
+                            return node;
+                          })()
+       |]
+      where
+        createElement Nothing n = [jmacroE| document.createElement(`(n)`) |]
+        createElement (Just ns) n = [jmacroE| document.createElementNS(`(ns)`, `(n)`) |]
+        appendChild node c =
+            [jmacroE| `(node)`.appendChild(`(c)`) |]
+        setAttribute node (MkAttr ((Nothing, nm), (Value True val))) =
+            [jmacroE| `(node)`.setAttribute(`(nm)`, `(val)`) |]
+        setAttribute node (MkAttr ((Just ns, nm), (Value True val))) =
+            [jmacroE| `(node)`.setAttributeNS(`(ns)`, `(nm)`, `(val)`) |]
+
+  toJExpr (XMLToDOM (CDATA needsEscape txt)) =
+      [jmacroE| document.createTextNode(`(txt)`) |]
+
+instance ToJExpr HTML.XML where
+    toJExpr = toJExpr . XMLToInnerHTML
 
 -- | Provided for convenience since @Ident@ is exported by both
 -- @HSP.Identity@ and @JMacro@.  Using this you can avoid the need for an

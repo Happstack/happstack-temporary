@@ -11,11 +11,14 @@ Stability:           Provisional
 Category:            Web
 Build-type:          Simple
 Cabal-version:       >=1.2
+Extra-source-files:  example.hs,
+                     example2.hs
 
 Library
   Exposed-modules:   HSX.JMacro
+                     HSX.JMacroT
 
-  Build-depends:       
+  Build-depends:
                      base >4 && <5,
                      happstack-hsp,
                      hsx,
