@@ -23,7 +23,6 @@ main =
 
            js :: JStat
            js = [jmacro| document.getElementById('main').appendChild(`(html)`);
-                         document.getElementById('main').appendChild(document.createTextNode("i like <em>em</em>"));
                        |]
 
            handler :: ServerPart XML
