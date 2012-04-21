@@ -19,13 +19,10 @@ instance IntegerSupply (ServerPartT IO) where
 main :: IO ()
 main =
     do let html :: DOMNode
-           html = <p>Generate javascript from <span class="foo" id="h">HTML & XML</span>. <% cdata "<em>foo</em><em>bar</em>" %></p>
-
-           xml = evalIdentity html
+           html = <p>Generate javascript from <span class="foo" id="h">HTML & XML</span>.</p>
 
            js :: JStat
-           js = [jmacro| document.getElementById('main').appendChild(`(XMLToDOM xml)`);
-                         document.getElementById('main').appendChild(document.createTextNode("i like <em>em</em>"));
+           js = [jmacro| document.getElementById('main').appendChild(`(html)`);
                        |]
 
            handler :: ServerPart XML
