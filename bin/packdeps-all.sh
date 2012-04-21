@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for package in happstack-util happstack-data ixset happstack-ixset happstack-state happstack-server happstack-server-tls happstack happstack-hamlet happstack-heist happstack-hsp happstack-hstringtemplate happstack-plugins happstack-jmacro happstack-lite
+for package in happstack-util happstack-data ixset happstack-ixset happstack-state happstack-server happstack-server-tls happstack happstack-hamlet happstack-heist happstack-hsp happstack-hstringtemplate happstack-plugins happstack-jmacro happstack-lite hsx-jmacro
 do
   packdeps $package/$package.cabal
 done
