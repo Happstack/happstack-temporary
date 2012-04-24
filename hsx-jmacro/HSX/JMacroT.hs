@@ -30,7 +30,7 @@ import Control.Monad.Trans        (MonadIO, MonadTrans(..))
 import qualified Data.Text        as Strict
 import qualified Data.Text.Lazy   as Lazy
 import HSX.XMLGenerator           (Attr(..), XMLGen(..), XMLGenT(..), XMLGenerator, AppendChild(..), EmbedAsAttr(..), EmbedAsChild(..), Name(..), SetAttr(..), unXMLGenT)
-import qualified HSX.XMLGenerator as HSX
+
 import Language.Javascript.JMacro (ToJExpr(..), JExpr(..), JStat(..), ToStat(..), jmacroE, jLam, jVarTy)
 
 -- | isomorphic to IdentityT, but used for generating javascript that generates XML/HTML
@@ -59,9 +59,9 @@ instance (ToJExpr a) => ToJExpr (XMLGenT JMacroM a) where
     toJExpr = toJExpr . evalJMacroM
 
 instance (Functor m, Monad m) => XMLGen (JMacroT m) where
-    type XML          (JMacroT m) = JExpr
-    newtype Child     (JMacroT m) = JMChild { unJMChild :: JExpr }
-    newtype Attribute (JMacroT m) = JMAttr  { unJMAttr  :: JExpr }
+    type XMLType          (JMacroT m) = JExpr
+    newtype ChildType     (JMacroT m) = JMChild { unJMChild :: JExpr }
+    newtype AttributeType (JMacroT m) = JMAttr  { unJMAttr  :: JExpr }
     genElement        = element
     xmlToChild        = JMChild
     pcdataToChild str = JMChild $ [jmacroE| document.createTextNode(`(str)`) |]
