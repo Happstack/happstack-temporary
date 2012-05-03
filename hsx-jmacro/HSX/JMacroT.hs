@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, QuasiQuotes #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, TypeSynonymInstances, QuasiQuotes #-}
 -- | This experimental module provides a monad transformer 'JMacroT'
 -- and corresponding 'XMLGenerator' instance which can be used to
 -- directly generate javascript which builds an XML/HTML DOM.
@@ -31,7 +31,7 @@ import qualified Data.Text        as Strict
 import qualified Data.Text.Lazy   as Lazy
 import HSX.XMLGenerator           (Attr(..), XMLGen(..), XMLGenT(..), XMLGenerator, AppendChild(..), EmbedAsAttr(..), EmbedAsChild(..), Name(..), SetAttr(..), unXMLGenT)
 
-import Language.Javascript.JMacro (ToJExpr(..), JExpr(..), JStat(..), ToStat(..), jmacroE, jLam, jVarTy)
+import Language.Javascript.JMacro (ToJExpr(..), JExpr(..), JStat(..), JVal(JVar), Ident(StrI), ToStat(..), jmacroE, jLam, jVarTy)
 
 -- | isomorphic to IdentityT, but used for generating javascript that generates XML/HTML
 newtype JMacroT m a = JMacroT { unJMacroT :: m a }
