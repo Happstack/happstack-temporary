@@ -3,7 +3,7 @@
 -- See the Heist Section of the Happstack Crash Course for detailed documentation:
 --
 --  <http://happstack.com/docs/crashcourse/Templates.html#helloheist>
-module Happstack.Server.Heist 
+module Happstack.Server.Heist
     ( templateReloader
     , templateServe
     , render
@@ -22,9 +22,9 @@ import Text.Templating.Heist.TemplateDirectory (TemplateDirectory, getDirectoryT
 
 -- | serve the heist templates from the 'TemplateDirectory m'
 templateServe :: (ServerMonad m, MonadPlus m, MonadIO m) =>
-                 TemplateDirectory m 
+                 TemplateDirectory m
               -> m Response
-templateServe td = 
+templateServe td =
     msum [ nullDir >> render td (B.pack "index")
          , do rq <- askRq
               let safepath = joinPath $ filter (\x->not (null x) && x /= ".." && x /= ".") (rqPaths rq)
@@ -32,8 +32,8 @@ templateServe td =
          ]
 
 -- | force a reload of the templates from disk
-templateReloader :: (MonadIO m, MonadIO n) => 
-                    TemplateDirectory m 
+templateReloader :: (MonadIO m, MonadIO n) =>
+                    TemplateDirectory m
                  -> n Response
 templateReloader td = do
     e <- reloadTemplateDirectory td
@@ -42,7 +42,7 @@ templateReloader td = do
 
 
 -- | render the specified template
-render:: (MonadPlus m, MonadIO m) => 
+render:: (MonadPlus m, MonadIO m) =>
          TemplateDirectory m  -- ^ 'TemplateDirectory' handle
       -> ByteString           -- ^ template name
       -> m Response
