@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, TypeFamilies, OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances, RankNTypes, TypeFamilies, OverloadedStrings #-}
 -- | This modules provides templates and routing functions which can
 -- be used to integrate authentication into your site.
 --
@@ -31,11 +31,6 @@ module Happstack.Auth.Blaze.Templates
     , logoutPage
     , changePasswordPage
     , changePasswordForm
-    , fieldset
-    , ol
-    , li
-    , notEmpty
-    , minLengthString
     ) where
 
 import Control.Applicative        (Alternative, (<*>), (<$>), (<*), (*>), optional)
@@ -62,18 +57,37 @@ import Happstack.Server            (Happstack, Input, Response, internalServerEr
 import Text.Blaze.Html5            as H hiding (fieldset, ol, li, label, head)
 import qualified Text.Blaze.Html5  as H
 import Text.Blaze.Html5.Attributes as A hiding (label)
-import Text.Digestive             ( Form, Transformer, Validator, (++>), (<++), check, mapView
-                                  , transform, transformEither, transformEitherM, validate)
-import Text.Digestive.Forms       (FormInput)
-import Text.Digestive.Blaze.Html5 (BlazeFormHtml, FormHtml(..), errors, inputPassword, inputPassword', inputText, inputText', label, renderFormHtml, submit, viewHtml)
-import Text.Digestive.Forms.Happstack (eitherHappstackForm)
+import Text.Reform
+import Text.Reform.Blaze.Text     as R
+import Text.Reform.Happstack      as R
 import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
 import Web.Authenticate.OpenId.Providers (google, yahoo, livejournal, myspace)
 import Web.Routes                 (RouteT(..), Site(..), PathInfo(..), MonadRoute(askRouteFn), parseSegments, showURL, showURLParams, nestURL, liftRouteT, URL)
 import Web.Routes.Happstack       (implSite_, seeOtherURL)
 
-inputString :: (Functor m, Monad m, FormInput i f) => Maybe String -> Form m i e BlazeFormHtml String
-inputString s = Text.unpack <$> inputText (Text.pack <$> s)
+smap :: (String -> String) -> Text -> Text
+smap f = Text.pack . f . Text.unpack
+
+data AuthTemplateError
+    = ATECommon (CommonFormError [Input])
+    | UPE UserPassError
+    | MinLength Int
+    | PasswordMismatch
+
+instance FormError AuthTemplateError where
+    type ErrorInputType AuthTemplateError = [Input]
+    commonFormError = ATECommon
+
+instance ToMarkup (CommonFormError [Input]) where
+    toMarkup e = toMarkup $ show e
+
+instance ToMarkup AuthTemplateError where
+    toMarkup (ATECommon e)    = toHtml $ e
+    toMarkup (UPE e)          = toHtml $ userPassErrorString e
+    toMarkup (MinLength n)    = toHtml $ "mimimum length: " ++ show n
+    toMarkup PasswordMismatch = "Passwords do not match."
+
+type AuthForm m a = Form m [Input] AuthTemplateError Html () a
 
 logoutPage :: (MonadRoute m, URL m ~ AuthURL, Alternative m, Happstack m) => AcidState AuthState -> m Html
 logoutPage authStateH =
@@ -128,7 +142,7 @@ authPicker :: (MonadRoute m, URL m ~ ProfileURL, Happstack m) => Set AuthId -> m
 authPicker authIds =
     do auths <- mapM auth (Set.toList authIds)
        return $ H.div ! A.id "happstack-authenticate" $
-                   ul $ sequence_ auths
+                   H.ul $ sequence_ auths
     where
       auth authId =
           do url <- H.toValue <$> showURL (P_SetAuthId authId)
@@ -140,7 +154,7 @@ personalityPicker :: (MonadRoute m, URL m ~ ProfileURL, Happstack m) =>
 personalityPicker profiles =
     do personalities <- mapM personality (Set.toList profiles)
        return $ H.div ! A.id "happstack-authenticate" $
-                   ul $ sequence_ personalities
+                   H.ul $ sequence_ personalities
     where
       personality profile =
           do url <- H.toValue <$> showURL (P_SetPersonality (userId profile))
@@ -183,22 +197,24 @@ myspacePage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
             -> m Response
 myspacePage appTemplate here authMode =
     do actionURL <- showURL here
-       e <- eitherHappstackForm usernameForm "msp"
+       e <- happstackEitherForm (R.form actionURL) "msp" usernameForm
        case e of
          (Left formHtml) ->
              do r <- appTemplate "Login via Myspace" mempty $
                        H.div ! A.id "happstack-authenticate" $
                         do h1 "Login using your myspace account"
                            p "Enter your Myspace account name to connect."
-                           formToHtml actionURL formHtml
+                           formHtml
                 ok r
          (Right username) ->
-             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ Text.pack $ myspace username)]
+             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ smap myspace username)]
                 seeOther (Text.unpack u) (toResponse ())
+
       where
-        usernameForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
+        usernameForm :: (Functor m, Monad m) => AuthForm m Text
         usernameForm =
-            label "http://www.myspace.com/" ++> inputString Nothing <* (mapHtml (\html -> html ! A.class_  "submit") $ submit "Login")
+            label ("http://www.myspace.com/" :: String) ++> inputText mempty <* (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Login")
+
 
 liveJournalPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                    (String -> Html -> Html -> m Response)
@@ -207,22 +223,23 @@ liveJournalPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                 -> m Response
 liveJournalPage appTemplate here authMode =
     do actionURL <- showURL here
-       e <- eitherHappstackForm liveJournalForm "ljp"
+       e <- happstackEitherForm (R.form actionURL) "ljp" liveJournalForm
        case e of
          (Left formHtml) ->
              do r <- appTemplate "Login via LiveJournal" mempty $
                      H.div ! A.id "happstack-authenticate" $
                       do h1 $ "Login using your Live Journal account"
                          p $ "Enter your livejournal account name to connect. You may be prompted to log into your livejournal account and to confirm the login."
-                         formToHtml actionURL formHtml
+                         formHtml
                 ok r
          (Right username) ->
-             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ Text.pack $ livejournal username)]
+             do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ smap livejournal username)]
                 seeOther (Text.unpack u) (toResponse ())
 
-liveJournalForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
+liveJournalForm :: (Functor m, Monad m) => AuthForm m Text
 liveJournalForm =
-    label "http://" ++> inputString Nothing <++ label ".livejournal.com/" <* (mapHtml (\html -> html ! A.class_  "submit") $ submit "Connect")
+    label ("http://" :: String) ++> inputText mempty <++ label (".livejournal.com/" :: String) <*
+    (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Connect")
 
 genericOpenIdPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                      (String -> Html -> Html -> m Response)
@@ -231,21 +248,21 @@ genericOpenIdPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                   -> m Response
 genericOpenIdPage appTemplate here authMode =
     do actionURL <- showURL here
-       e <- eitherHappstackForm openIdURLForm "oiu"
+       e <- happstackEitherForm (R.form actionURL) "oiu" openIdURLForm
        case e of
          (Left formHtml) ->
              do r <- appTemplate "Login via Generic OpenId" mempty $
                        H.div ! A.id "happstack-authenticate" $
                         do h1 "Login using your OpenId account"
-                           formToHtml actionURL formHtml
+                           formHtml
                 ok r
          (Right url) ->
              do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just url)]
                 seeOther (Text.unpack u) (toResponse ())
       where
-        openIdURLForm :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml Text
+        openIdURLForm :: (Functor m, Monad m) => AuthForm m Text
         openIdURLForm =
-            label "Your OpenId url: " ++> inputText Nothing <* submit "Connect"
+            label ("Your OpenId url: " :: String) ++> inputText mempty <* inputSubmit "Connect"
 
 -- | Function which takes care of all 'AuthURL' routes.
 --
@@ -405,13 +422,13 @@ handleAuthProfileRouteT authStateH profileStateH appTemplate mFacebook mRealm po
 localLoginPage authStateH appTemplate here onAuthURL =
     do actionURL <- showURL here
        createURL <- showURL A_CreateAccount
-       e <- eitherHappstackForm (loginForm createURL) "lf"
+       e <- happstackEitherForm (R.form actionURL) "lf" (loginForm createURL)
        case e of
-         (Left formHtml) ->
+         (Left errorForm) ->
              do r <- appTemplate "Login" mempty $
                      H.div ! A.id "happstack-authenticate" $
                       do h1 "Login"
-                         formToHtml actionURL formHtml
+                         errorForm
                 ok r
          (Right userPassId) ->
             do authId <- do authIds <- query' authStateH (UserPassIdAuthIds userPassId)
@@ -423,94 +440,68 @@ localLoginPage authStateH appTemplate here onAuthURL =
 
       where
         loginForm createURL =
-            (errors ++> (fieldset $ ol (((,) <$> (li $ label "username: " ++> inputText Nothing) <*> (li $ label "password: " ++> inputPassword True) <* login) `transform` checkAuth))) <* (create createURL)
+            R.fieldset $
+             R.ol (((,) <$> (R.li $ errorList ++> label ("username: " :: String) ++> inputText mempty)
+                        <*> (R.li $ errorList ++> label ("password: " :: String) ++> inputPassword)
+                        <* login) `transformEitherM` checkAuth)
+                  <* (create createURL)
 
-        create createURL = viewHtml $ p $ do "or "
-                                             H.a ! href (toValue createURL) $ "create a new account"
-        login = li $ mapHtml (\html -> html ! A.class_  "submit") (submit "Login")
+        create createURL = view $ p $ do "or "
+                                         H.a ! href (toValue createURL) $ "create a new account"
+        login = li $ mapView (\html -> html ! A.class_  "submit") (inputSubmit "Login")
 
-        checkAuth =
-            transformEitherM $ \(username, password) ->
+        checkAuth :: (MonadIO m) => (Text, Text) -> m (Either AuthTemplateError UserPassId)
+        checkAuth (username, password) =
                 do r <- query' authStateH (CheckUserPass username password)
                    case r of
-                     (Left e) -> return (Left $ toHtml $ userPassErrorString e)
+                     (Left e) -> return (Left $ UPE e)
                      (Right userPassId) -> return (Right userPassId)
 
 createAccountPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) => AcidState AuthState -> (String -> Html -> Html -> m Response) -> Text -> AuthURL -> m Response
 createAccountPage authStateH appTemplate onAuthURL here =
     do actionURL <- showURL here
-       e <- eitherHappstackForm (newAccountForm authStateH) "naf"
+       e <- happstackEitherForm (R.form actionURL) "naf" (newAccountForm authStateH)
        case e of
+
          (Left formHtml) ->
              do r <- appTemplate "Create New Account" mempty $
                      H.div ! A.id "happstack-authenticate" $
                       do h1 "Create an account"
-                         formToHtml actionURL formHtml
+                         formHtml
                 ok r
+
          (Right (authId, userPassId)) ->
              do addAuthCookie authStateH (Just authId) (AuthUserPassId userPassId)
                 seeOther (Text.unpack onAuthURL) (toResponse ())
 
-newAccountForm :: (Functor v, MonadIO v) => AcidState AuthState -> Form v [Input] Html BlazeFormHtml (AuthId, UserPassId)
+newAccountForm :: (Functor v, MonadIO v) => AcidState AuthState -> AuthForm v (AuthId, UserPassId)
 newAccountForm authStateH =
-    fieldset (errors ++> (ol $ ((,) <$> username <*> password <* submitButton)
-                `transform`
-                createAccount))
+    (R.fieldset (R.ol $ (((,) <$> username <*> password <* submitButton)))
+                    `transformEitherM`
+                    createAccount)
     where
-      submitButton = li $ (mapHtml (\html -> html ! A.class_  "submit") $ submit "Create Account")
-      username  = li $ ((label "username: "         ++> inputText Nothing  <++ errors) `validate` notEmpty)
-      password1 = li $ label "password: "         ++> inputPassword' True <++ errors
-      password2 = li $ label "confirm password: " ++> inputPassword' True <++ errors
+      submitButton = R.li $ (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Create Account")
+      username  = R.li $ errorList ++> ((label ("username: " :: String)       ++> inputText mempty) `transformEither` (minLength 1))
+      password1 = R.li $ label ("password: " :: String)         ++> inputPassword
+      password2 = R.li $ label ("confirm password: " :: String) ++> inputPassword
 
       password =
-          (minLengthString 6 $
-           (((,) <$> password1 <*> password2) `transform` samePassword))
+          errorList ++> (((,) <$> password1 <*> password2) `transformEither` samePassword) `transformEither` minLength 6
 
-      samePassword =
-          transformEither $ \(p1, p2) ->
+      samePassword (p1, p2) =
               if p1 /= p2
-               then (Left $ p "Passwords do not match.")
+               then (Left $ PasswordMismatch)
                else (Right p1)
 
-      createAccount =
-          transformEitherM $ \(username, password) ->
-              do passHash <- liftIO $ mkHashedPass (Text.pack password)
+      createAccount (username, password) =
+              do passHash <- liftIO $ mkHashedPass password
                  r <- update' authStateH $ CreateUserPass (UserName username) passHash
                  -- fixme: race condition
                  case r of
-                   (Left e) -> return (Left $ p $ toHtml (userPassErrorString e))
+                   (Left e) -> return (Left $ UPE e)
                    (Right userPass) ->
                        do authId <- update' authStateH (NewAuthMethod (AuthUserPassId (upId userPass)))
                           return (Right (authId, upId userPass))
-
-fieldset, ol, li :: (Functor v, Monad v) => Form v [Input] e BlazeFormHtml a -> Form v [Input] e BlazeFormHtml a
-fieldset = mapHtml (\html -> H.fieldset $ html)
-ol       = mapHtml (\html -> H.ol $ html)
-li       = mapHtml (\html -> H.li $ html)
-
-mapHtml :: (Functor v, Monad v) => (Html -> Html) -> Form v i e BlazeFormHtml a -> Form v i e BlazeFormHtml a
-mapHtml fn = mapView fn'
-    where
-      fn' :: (BlazeFormHtml -> BlazeFormHtml)
-      fn' (FormHtml encType formHtml) =
-          let formHtml' = \formHtmlConfig -> fn (formHtml formHtmlConfig)
-          in (FormHtml encType formHtml')
-
-notEmpty :: (Monad m) => Validator m Html Text
-notEmpty = (check $ H.span "field can not be empty") (not . Text.null)
-
-minLengthString :: (Monad v) => Int -> Form v [Input] Html BlazeFormHtml String -> Form v [Input] Html BlazeFormHtml String
-minLengthString 0 f = f
-minLengthString 1 f = errors ++> (f `validate` (check ("This field can not be empty.") (not . null)))
-minLengthString n f = errors ++> (f `validate` (check (toHtml $ "This field must be at least " ++ show n ++ " characters.") (\t -> length t >= n)))
-
-formToHtml :: Text -> FormHtml Html -> Html
-formToHtml actionURL formHtml =
-    let (formHtml', enctype) = renderFormHtml formHtml
-    in H.form ! A.enctype (toValue $ show enctype)
-              ! A.method "POST"
-              ! A.action (toValue actionURL) $
-             formHtml'
 
 changePasswordPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                       AcidState AuthState -> (String -> Html -> Html -> m Response) -> AuthURL -> m Response
@@ -530,17 +521,17 @@ changePasswordPage authStateH appTemplate here =
                                                                                                 toHtml $ show $ unUserPassId userPassId
                                internalServerError resp
                         (Just userPass) ->
-                            do e <- eitherHappstackForm (changePasswordForm authStateH userPass) "cpf"
+                            do e <- happstackEitherForm (R.form actionURL) "cpf" (changePasswordForm authStateH userPass)
                                case e of
                                  (Left formHtml) ->
                                     do r <- appTemplate "Change Passowrd" mempty $
                                                  H.div ! A.id "happstack-authenticate" $
                                                      do h1 $ do "Change password for "
                                                                 toHtml $ unUserName $ upName userPass
-                                                                formToHtml actionURL formHtml
+                                                                formHtml
                                        ok r
                                  (Right passwd) ->
-                                    do hashedPass <- liftIO $ mkHashedPass (Text.pack passwd)
+                                    do hashedPass <- liftIO $ mkHashedPass passwd
                                        r <- update' authStateH (SetPassword userPassId hashedPass)
                                        case r of
                                          (Just e) ->
@@ -554,36 +545,41 @@ changePasswordPage authStateH appTemplate here =
                                                            p $ "Your password has been updated."
                                                 ok resp
 
-changePasswordForm  :: (Functor v, MonadIO v) => AcidState AuthState -> UserPass -> Form v [Input] Html BlazeFormHtml String
+changePasswordForm  :: (Functor v, MonadIO v) => AcidState AuthState -> UserPass -> AuthForm v Text
 changePasswordForm authStateH userPass =
     fieldset $ ol $ oldPassword *> newPassword <* changeBtn
     where
       -- form elements
       oldPassword =
-          errors ++>
-          (li $  label "old password: " ++> inputPassword True `transform` checkAuth)
-      checkAuth =
-          transformEitherM $ \password ->
+          errorList ++>
+          (li $  label ("old password: " :: String) ++> inputPassword `transformEitherM` checkAuth)
+
+      checkAuth password =
               do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) password)
                  case r of
-                   (Left e)  -> return (Left $ toHtml (userPassErrorString e))
+                   (Left e)  -> return (Left $ UPE e)
                    (Right _) -> return (Right password)
 
-      password1, password2 :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
-      password1 = li $ label "new password: "         ++> inputPassword' True
-      password2 = li $ label "new confirm password: " ++> inputPassword' True
+      password1, password2 :: (Functor v, Monad v) => AuthForm v Text
+      password1 = li $ label ("new password: "         :: String) ++> inputPassword
+      password2 = li $ label ("new confirm password: " :: String) ++> inputPassword
 
-      newPassword :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml String
+      newPassword :: (Functor v, Monad v) => AuthForm v Text
       newPassword =
-          errors ++> (minLengthString 6 $
-                      ((((,) <$> password1 <*> password2)) `transform` samePassword))
+          errorList ++>
+           (((((,) <$> password1 <*> password2)) `transformEither` samePassword) `transformEither` minLength 6)
 
-      samePassword :: (Monad m) => Transformer m Html (String, String) String
-      samePassword =
-          transformEither $ \(p1, p2) ->
+      samePassword :: (Text, Text) -> Either AuthTemplateError Text
+      samePassword (p1, p2) =
               if p1 /= p2
-               then (Left $ "Passwords do not match.")
+               then (Left $ PasswordMismatch)
                else (Right p1)
 
-      changeBtn :: (Functor v, Monad v) => Form v [Input] Html BlazeFormHtml ()
-      changeBtn = li $ mapHtml (\html -> html ! A.class_  "submit") $ submit "change"
+      changeBtn :: (Functor v, Monad v) => AuthForm v (Maybe Text)
+      changeBtn = li $ mapView (\html -> html ! A.class_  "submit") $ inputSubmit "change"
+
+minLength :: Int -> Text -> Either AuthTemplateError Text
+minLength n s =
+          if Text.length s >= n
+          then (Right s)
+          else (Left $ MinLength n)
