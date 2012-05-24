@@ -37,7 +37,7 @@ Library
                        http-types                   == 0.6.*,
                        fb                           == 0.9.*,
                        safecopy                     == 0.6.*,
-                       mtl                          == 2.0.*,
+                       mtl                          >= 2.0,
                        pwstore-purehaskell          == 2.1.*,
                        QuickCheck                   >= 2,
                        text                         == 0.11.*,
