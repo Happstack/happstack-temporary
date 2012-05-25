@@ -6,6 +6,7 @@ import Control.Concurrent (forkIO, ThreadId)
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
+import Control.Exception (finally)
 import Control.Monad.Trans (liftIO)
 import Data.Aeson (ToJSON, encode, toJSON)
 import Data.Aeson.TH (deriveJSON)
@@ -34,7 +35,8 @@ forkPoll :: PollMap a
 forkPoll (PollMap pm) proc =
     do pid <- PollId . unpack . Base64.encode <$> getEntropy 8
        tc  <- atomically $ newTChan
-       tid <- forkIO $ proc tc
+       tid <- forkIO $ (proc tc) `finally`
+                          (atomically $ modifyTVar pm (\m -> Map.delete pid m))
        atomically $ modifyTVar pm (\m -> Map.insert pid (tid, tc) m)
        return pid
 
