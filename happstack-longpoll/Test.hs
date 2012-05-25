@@ -53,7 +53,11 @@ counter pm =
       callback =
           [jmacroE| function(d) { $("#msgs").append($(document.createElement('li')).append(d.message)); } |]
 
-counterProc :: TChan Msg
+counterProc :: TChan (PollData Msg)
             -> IO ()
 counterProc tchan =
-    mapM_ (\s -> do threadDelay 2000000 ; atomically $ writeTChan tchan (Msg s)) ["one","two","three","four"]
+    do mapM_ (\s -> do threadDelay 2000000 ; atomically $ writeTChan tchan (PollData "continue" (Msg s))) ["one","two","three","four"]
+       threadDelay 2000000
+       atomically $ writeTChan tchan (PollData { action = "stop"
+                                               , value  = Msg "five"
+                                               })

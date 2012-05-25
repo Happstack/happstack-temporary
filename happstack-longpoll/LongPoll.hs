@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, QuasiQuotes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, QuasiQuotes, TemplateHaskell #-}
 module LongPoll where
 
 import Control.Applicative ((<$>))
@@ -8,6 +8,7 @@ import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.Trans (liftIO)
 import Data.Aeson (ToJSON, encode, toJSON)
+import Data.Aeson.TH (deriveJSON)
 import Data.ByteString.Char8 (unpack)
 import Data.Map (Map)
 import Data.String (fromString)
@@ -21,14 +22,14 @@ import qualified Data.ByteString.Base64.URL as Base64
 newtype PollId = PollId { unPollId :: String }
     deriving (Eq, Ord, Show, ToJExpr)
 
-newtype PollMap a = PollMap { unPollMap :: TVar (Map PollId (ThreadId, TChan a)) }
+newtype PollMap a = PollMap { unPollMap :: TVar (Map PollId (ThreadId, TChan (PollData a))) }
 
 initPolling :: IO (PollMap a)
 initPolling =
     atomically $ PollMap <$> newTVar Map.empty
 
 forkPoll :: PollMap a
-         -> (TChan a -> IO ())
+         -> (TChan (PollData a) -> IO ())
          -> IO PollId
 forkPoll (PollMap pm) proc =
     do pid <- PollId . unpack . Base64.encode <$> getEntropy 8
@@ -55,7 +56,13 @@ pollUpdate' (PollMap pm) pid =
          Nothing -> notFound $ toResponse ("Invalid PollId: " ++ show pid)
          (Just (_, tc)) ->
              do a <- liftIO $ atomically $ readTChan tc
-                ok $ toResponse (toResponseBS (fromString "application/json") (encode a))
+                ok $ toResponseBS (fromString "application/json") (encode a)
+
+data PollData a
+    = PollData { action :: String
+               , value  :: a
+               }
+$(deriveJSON id ''PollData)
 
 clientLoop :: String -- ^ url to POST requests to
            -> JExpr   -- ^ expression to apply to JSON value.
@@ -64,7 +71,7 @@ clientLoop :: String -- ^ url to POST requests to
 clientLoop url f pid =
     [jmacro|
              function longPoll () {
-                            jQuery.post(`(url)`, { 'pollId' : `(pid)` }, function(d) { `(f)`(d); longPoll(); }, 'json');
+                            jQuery.post(`(url)`, { 'pollId' : `(pid)` }, function(d) { `(f)`(d.value); if (d.action == 'continue') longPoll(); }, 'json');
                           }
              $(document).ready(longPoll);
            |]
