@@ -441,10 +441,11 @@ localLoginPage authStateH appTemplate here onAuthURL =
       where
         loginForm createURL =
             R.fieldset $
-             R.ol (((,) <$> (R.li $ errorList ++> label ("username: " :: String) ++> inputText mempty)
-                        <*> (R.li $ errorList ++> label ("password: " :: String) ++> inputPassword)
-                        <* login) `transformEitherM` checkAuth)
-                  <* (create createURL)
+             (errorList ++>
+               R.ol (((,) <$> (R.li $ errorList ++> label ("username: " :: String) ++> inputText mempty)
+                          <*> (R.li $ errorList ++> label ("password: " :: String) ++> inputPassword)
+                          <* login) `transformEitherM` checkAuth)
+                    <* (create createURL))
 
         create createURL = view $ p $ do "or "
                                          H.a ! href (toValue createURL) $ "create a new account"
@@ -476,9 +477,11 @@ createAccountPage authStateH appTemplate onAuthURL here =
 
 newAccountForm :: (Functor v, MonadIO v) => AcidState AuthState -> AuthForm v (AuthId, UserPassId)
 newAccountForm authStateH =
-    (R.fieldset (R.ol $ (((,) <$> username <*> password <* submitButton)))
+    (R.fieldset
+     (errorList ++>
+      (R.ol $ (((,) <$> username <*> password <* submitButton)))
                     `transformEitherM`
-                    createAccount)
+                    createAccount))
     where
       submitButton = R.li $ (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Create Account")
       username  = R.li $ errorList ++> ((label ("username: " :: String)       ++> inputText mempty) `transformEither` (minLength 1))
