@@ -12,7 +12,7 @@ License-file:        LICENSE
 Author:              Jeremy Shaw
 Maintainer:          jeremy@seereason.com
 Copyright:           2010 Jeremy Shaw
-Category:            Web
+Category:            Web, Happstack
 Build-type:          Simple
 Cabal-version:       >=1.6
 Extra-source-files:  demo.hs

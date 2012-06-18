@@ -7,7 +7,7 @@ License-file:        LICENSE
 Author:              Jeremy Shaw
 Maintainer:          jeremy@seereason.com
 Homepage:            http://happstack.com/
-Category:            Web
+Category:            Web, Happstack
 Build-Type:          Simple
 Cabal-Version:       >=1.2
 Stability:           Stable
