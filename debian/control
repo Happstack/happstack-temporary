@@ -1,68 +1,162 @@
 Source: haskell-happstack-authenticate
-Priority: optional
-Section: misc
-Maintainer: Jeremy Shaw <jeremy@seereason.com>
-Build-Depends: debhelper (>= 7.0),
-               haskell-devscripts (>= 0.6.15+nmu7),
-               hscolour,
-               cdbs,
-               ghc (>= 6.8),
-               ghc-prof,
-               libghc-quickcheck2-prof,
-               libghc-acid-state-prof,
-               libghc-aeson-prof,
-               libghc-authenticate-prof (>= 0.9),
-               libghc-digestive-functors-prof,
-               libghc-digestive-functors-blaze-prof,
-               libghc-digestive-functors-happstack-prof,
-               libghc-digestive-functors-hsp-prof,
-               libghc-happstack-hsp-prof,
-               libghc-ixset-prof,
-               libghc-happstack-server-prof (>= 6.0),
-               libghc-happstack-server-prof (<< 6.7),
-               libghc-hsp-prof,
-               libghc-hsx-prof (>= 0.9.1),
-               libghc-mtl-prof,
-               libghc-pwstore-purehaskell-prof,
-               libghc-safecopy-prof,
-               libghc-text-prof,
-               libghc-unordered-containers-prof,
-               libghc-web-routes-prof (>= 0.26),
-               libghc-web-routes-happstack-prof,
-               libghc-web-routes-hsp-prof,
-               haskell-hsx-utils
-Build-Depends-Indep: ghc-doc,
-                     haddock,
-                     libghc-quickcheck2-doc,
-                     libghc-acid-state-doc, 
-                     libghc-aeson-doc,
-                     libghc-authenticate-doc (>= 0.9),
-                     libghc-digestive-functors-doc,
-                     libghc-digestive-functors-blaze-doc,
-                     libghc-digestive-functors-happstack-doc,
-                     libghc-digestive-functors-hsp-doc,
-                     libghc-happstack-hsp-doc,
-                     libghc-ixset-doc,
-                     libghc-happstack-server-doc (>= 6.0),
-                     libghc-happstack-server-doc (<< 6.7),
-                     libghc-hsp-doc,
-                     libghc-hsx-doc (>= 0.9.1),
-                     libghc-mtl-doc,
-                     libghc-pwstore-purehaskell-doc,
-                     libghc-safecopy-doc,
-                     libghc-text-doc,
-                     libghc-unordered-containers-doc,
-                     libghc-web-routes-doc,
-                     libghc-web-routes-happstack-doc,
-                     libghc-web-routes-hsp-doc
-Standards-Version: 3.8.1
+Priority: extra
+Section: haskell
+Maintainer: David Fox <dsf@seereason.com>
+Build-Depends: debhelper (>= 7.0)
+               , haskell-devscripts (>= 0.8)
+               , cdbs
+               , ghc
+               , ghc-prof
+               , libghc-quickcheck2-dev (>= 2)
+               , libghc-quickcheck2-prof (>= 2)
+               , libghc-acid-state-dev (>= 0.6)
+               , libghc-acid-state-dev (<< 0.7)
+               , libghc-acid-state-prof (>= 0.6)
+               , libghc-acid-state-prof (<< 0.7)
+               , libghc-aeson-dev (>= 0.4)
+               , libghc-aeson-dev (<< 0.7)
+               , libghc-aeson-prof (>= 0.4)
+               , libghc-aeson-prof (<< 0.7)
+               , libghc-authenticate-dev (>= 1.2)
+               , libghc-authenticate-dev (<< 1.3)
+               , libghc-authenticate-prof (>= 1.2)
+               , libghc-authenticate-prof (<< 1.3)
+               , libghc-base-dev (>> 4) | ghc
+               , libghc-base-dev (<< 5) | ghc
+               , libghc-base-prof (>> 4) | ghc-prof
+               , libghc-base-prof (<< 5) | ghc-prof
+               , libghc-blaze-html-dev (>= 0.5)
+               , libghc-blaze-html-dev (<< 0.6)
+               , libghc-blaze-html-prof (>= 0.5)
+               , libghc-blaze-html-prof (<< 0.6)
+               , libghc-bytestring-dev (>= 0.9) | ghc
+               , libghc-bytestring-dev (<< 0.10) | ghc
+               , libghc-bytestring-prof (>= 0.9) | ghc-prof
+               , libghc-bytestring-prof (<< 0.10) | ghc-prof
+               , libghc-containers-dev (>= 0.4) | ghc
+               , libghc-containers-dev (<< 0.5) | ghc
+               , libghc-containers-prof (>= 0.4) | ghc-prof
+               , libghc-containers-prof (<< 0.5) | ghc-prof
+               , libghc-fb-dev (>= 0.9)
+               , libghc-fb-dev (<< 0.10)
+               , libghc-fb-prof (>= 0.9)
+               , libghc-fb-prof (<< 0.10)
+               , libghc-happstack-server-dev (>= 6.0)
+               , libghc-happstack-server-dev (<< 7.1)
+               , libghc-happstack-server-prof (>= 6.0)
+               , libghc-happstack-server-prof (<< 7.1)
+               , libghc-http-conduit-dev (>= 1.4)
+               , libghc-http-conduit-dev (<< 1.5)
+               , libghc-http-conduit-prof (>= 1.4)
+               , libghc-http-conduit-prof (<< 1.5)
+               , libghc-http-types-dev (>= 0.6)
+               , libghc-http-types-dev (<< 0.8)
+               , libghc-http-types-prof (>= 0.6)
+               , libghc-http-types-prof (<< 0.8)
+               , libghc-ixset-dev (>= 1.0)
+               , libghc-ixset-dev (<< 1.1)
+               , libghc-ixset-prof (>= 1.0)
+               , libghc-ixset-prof (<< 1.1)
+               , libghc-mtl-dev (>= 2.0)
+               , libghc-mtl-prof (>= 2.0)
+               , libghc-pwstore-purehaskell-dev (>= 2.1)
+               , libghc-pwstore-purehaskell-dev (<< 2.2)
+               , libghc-pwstore-purehaskell-prof (>= 2.1)
+               , libghc-pwstore-purehaskell-prof (<< 2.2)
+               , libghc-reform-dev (>= 0.1)
+               , libghc-reform-dev (<< 0.2)
+               , libghc-reform-prof (>= 0.1)
+               , libghc-reform-prof (<< 0.2)
+               , libghc-reform-blaze-dev (>= 0.1)
+               , libghc-reform-blaze-dev (<< 0.2)
+               , libghc-reform-blaze-prof (>= 0.1)
+               , libghc-reform-blaze-prof (<< 0.2)
+               , libghc-reform-happstack-dev (>= 0.1)
+               , libghc-reform-happstack-dev (<< 0.2)
+               , libghc-reform-happstack-prof (>= 0.1)
+               , libghc-reform-happstack-prof (<< 0.2)
+               , libghc-safecopy-dev (>= 0.6)
+               , libghc-safecopy-dev (<< 0.7)
+               , libghc-safecopy-prof (>= 0.6)
+               , libghc-safecopy-prof (<< 0.7)
+               , libghc-text-dev (>= 0.11)
+               , libghc-text-dev (<< 0.12)
+               , libghc-text-prof (>= 0.11)
+               , libghc-text-prof (<< 0.12)
+               , libghc-time-dev (>= 1.2) | ghc
+               , libghc-time-dev (<< 1.5) | ghc
+               , libghc-time-prof (>= 1.2) | ghc-prof
+               , libghc-time-prof (<< 1.5) | ghc-prof
+               , libghc-unordered-containers-dev (>= 0.2)
+               , libghc-unordered-containers-dev (<< 0.3)
+               , libghc-unordered-containers-prof (>= 0.2)
+               , libghc-unordered-containers-prof (<< 0.3)
+               , libghc-web-routes-dev (>= 0.26)
+               , libghc-web-routes-dev (<< 0.28)
+               , libghc-web-routes-prof (>= 0.26)
+               , libghc-web-routes-prof (<< 0.28)
+               , libghc-web-routes-happstack-dev (>= 0.23)
+               , libghc-web-routes-happstack-dev (<< 0.24)
+               , libghc-web-routes-happstack-prof (>= 0.23)
+               , libghc-web-routes-happstack-prof (<< 0.24)
+Build-Depends-Indep: ghc-doc
+                     , libghc-quickcheck2-doc (>= 2)
+                     , libghc-acid-state-doc (>= 0.6)
+                     , libghc-acid-state-doc (<< 0.7)
+                     , libghc-aeson-doc (>= 0.4)
+                     , libghc-aeson-doc (<< 0.7)
+                     , libghc-authenticate-doc (>= 1.2)
+                     , libghc-authenticate-doc (<< 1.3)
+                     , libghc-base-doc (>> 4) | ghc-doc
+                     , libghc-base-doc (<< 5) | ghc-doc
+                     , libghc-blaze-html-doc (>= 0.5)
+                     , libghc-blaze-html-doc (<< 0.6)
+                     , libghc-bytestring-doc (>= 0.9) | ghc-doc
+                     , libghc-bytestring-doc (<< 0.10) | ghc-doc
+                     , libghc-containers-doc (>= 0.4) | ghc-doc
+                     , libghc-containers-doc (<< 0.5) | ghc-doc
+                     , libghc-fb-doc (>= 0.9)
+                     , libghc-fb-doc (<< 0.10)
+                     , libghc-happstack-server-doc (>= 6.0)
+                     , libghc-happstack-server-doc (<< 7.1)
+                     , libghc-http-conduit-doc (>= 1.4)
+                     , libghc-http-conduit-doc (<< 1.5)
+                     , libghc-http-types-doc (>= 0.6)
+                     , libghc-http-types-doc (<< 0.8)
+                     , libghc-ixset-doc (>= 1.0)
+                     , libghc-ixset-doc (<< 1.1)
+                     , libghc-mtl-doc (>= 2.0)
+                     , libghc-pwstore-purehaskell-doc (>= 2.1)
+                     , libghc-pwstore-purehaskell-doc (<< 2.2)
+                     , libghc-reform-doc (>= 0.1)
+                     , libghc-reform-doc (<< 0.2)
+                     , libghc-reform-blaze-doc (>= 0.1)
+                     , libghc-reform-blaze-doc (<< 0.2)
+                     , libghc-reform-happstack-doc (>= 0.1)
+                     , libghc-reform-happstack-doc (<< 0.2)
+                     , libghc-safecopy-doc (>= 0.6)
+                     , libghc-safecopy-doc (<< 0.7)
+                     , libghc-text-doc (>= 0.11)
+                     , libghc-text-doc (<< 0.12)
+                     , libghc-time-doc (>= 1.2) | ghc-doc
+                     , libghc-time-doc (<< 1.5) | ghc-doc
+                     , libghc-unordered-containers-doc (>= 0.2)
+                     , libghc-unordered-containers-doc (<< 0.3)
+                     , libghc-web-routes-doc (>= 0.26)
+                     , libghc-web-routes-doc (<< 0.28)
+                     , libghc-web-routes-happstack-doc (>= 0.23)
+                     , libghc-web-routes-happstack-doc (<< 0.24)
+Standards-Version: 3.9.3
 Homepage: http://src.seereason.com/happstack-authenticate
 
 Package: libghc-happstack-authenticate-dev
 Architecture: any
-Section: haskell
-Depends: ${haskell:Depends},
-         ${misc:Depends}
+Depends: ${shlibs:Depends}
+         , ${haskell:Depends}
+         , ${misc:Depends}
+Recommends: ${haskell:Recommends}
+Suggests: ${haskell:Suggests}
+Provides: ${haskell:Provides}
 Description: Happstack Authentication Library
  A themeable authentication library with support for username+password and OpenId.
  .
@@ -73,10 +167,11 @@ Description: Happstack Authentication Library
 
 Package: libghc-happstack-authenticate-prof
 Architecture: any
-Section: haskell
-Depends: ${haskell:Depends},
-         ${misc:Depends},
-         libghc-happstack-authenticate-dev
+Depends: ${haskell:Depends}
+         , ${misc:Depends}
+Recommends: ${haskell:Recommends}
+Suggests: ${haskell:Suggests}
+Provides: ${haskell:Provides}
 Description: Happstack Authentication Library
  A themeable authentication library with support for username+password and OpenId.
  .
@@ -88,9 +183,10 @@ Description: Happstack Authentication Library
 Package: libghc-happstack-authenticate-doc
 Architecture: all
 Section: doc
-Depends: ${haskell:Depends},
-         ${misc:Depends},
-         ghc-doc
+Depends: ${haskell:Depends}
+         , ${misc:Depends}
+Recommends: ${haskell:Recommends}
+Suggests: ${haskell:Suggests}
 Description: Happstack Authentication Library
  A themeable authentication library with support for username+password and OpenId.
  .
