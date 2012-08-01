@@ -89,9 +89,23 @@ newtype HashedPass = HashedPass ByteString
     deriving (Eq, Ord, Read, Show, Data, Typeable)
 $(deriveSafeCopy 1 'base ''HashedPass)
 
+-- | NOTE: The Eq and Ord instances are 'case-insensitive'. They apply 'toCaseFold' before comparing.
 newtype UserName = UserName { unUserName :: Text }
-    deriving (Eq, Ord, Read, Show, Data, Typeable)
+    deriving (Read, Show, Data, Typeable)
 $(deriveSafeCopy 1 'base ''UserName)
+
+instance Eq UserName where
+    (UserName x) == (UserName y) = (Text.toCaseFold x) == (Text.toCaseFold y)
+    (UserName x) /= (UserName y) = (Text.toCaseFold x) /= (Text.toCaseFold y)
+
+instance Ord UserName where
+    compare (UserName x) (UserName y) = compare (Text.toCaseFold x) (Text.toCaseFold y)
+    (UserName x) <  (UserName y)      = (Text.toCaseFold x) <  (Text.toCaseFold y)
+    (UserName x) >= (UserName y)      = (Text.toCaseFold x) >= (Text.toCaseFold y)
+    (UserName x) >  (UserName y)      = (Text.toCaseFold x) >  (Text.toCaseFold y)
+    (UserName x) <= (UserName y)      = (Text.toCaseFold x) <= (Text.toCaseFold y)
+    max (UserName x) (UserName y)     = UserName $ max (Text.toCaseFold x) (Text.toCaseFold y)
+    min (UserName x) (UserName y)     = UserName $ min (Text.toCaseFold x) (Text.toCaseFold y)
 
 newtype UserPassId = UserPassId { unUserPassId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
