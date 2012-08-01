@@ -19,7 +19,7 @@ import Control.Monad.State   (get, put)
 import Control.Monad.Trans   (liftIO)
 import Data.Acid             (AcidState, Update, Query, makeAcidic)
 import Data.Acid.Advanced    (update')
-import Data.Generics         (Data, Typeable)
+import Data.Data             (Data, Typeable)
 import           Data.IxSet  ((@=), getOne, inferIxSet, noCalcs)
 import qualified Data.IxSet  as IxSet
 import Data.SafeCopy         (base, deriveSafeCopy)

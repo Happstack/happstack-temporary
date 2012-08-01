@@ -21,7 +21,7 @@ import System.Environment                (getArgs)
 import System.Exit                       (exitFailure)
 
 main :: IO ()
-main = 
+main =
     do args <- getArgs
        case args of
          [baseURI] ->
@@ -42,7 +42,7 @@ route acid@Acid{..} baseURI = do
     decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
     msum [ authProfileHandler baseURI (Text.pack "web") acidAuth acidProfile appTemplate Nothing (Just baseURI) (Text.pack "/profile_data/new")
          , handleProfileData acidAuth acidProfile acidProfileData
-         , dir "dump_auth" $ do authState <- query' acidAuth AskAuthState 
+         , dir "dump_auth" $ do authState <- query' acidAuth AskAuthState
                                 ok $ toResponse (show authState)
          , nullDir >> homePage acid
          ]
@@ -64,8 +64,8 @@ routeSiteURL acid@Acid{..} realm url =
 spec :: Acid       -- ^ database handle
      -> Maybe Text -- ^ authentication realm
      -> Site SiteURL (ServerPartT IO Response)
-spec acid realm = 
-    setDefault U_HomePage $ 
+spec acid realm =
+    setDefault U_HomePage $
       Site { handleSite          = \f u -> unRouteT (routeSiteURL acid realm u) f
            , formatPathSegments  = \u -> (toPathSegments u, [])
            , parsePathSegments   = parseSegments fromPathSegments
