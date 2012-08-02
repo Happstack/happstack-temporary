@@ -19,7 +19,7 @@ import Happstack.Server                  (Happstack, Response, lookPairsBS, look
 import Happstack.Auth.Core.Auth
 import Happstack.Auth.Core.AuthURL
 import Network.HTTP.Conduit       (withManager)
-import Web.Authenticate.OpenId    (Identifier, authenticate, getForwardUrl)
+import Web.Authenticate.OpenId    (Identifier, OpenIdResponse(..), authenticateClaimed, getForwardUrl)
 -- import Web.Authenticate.Facebook  (Facebook(..), getAccessToken, getGraphData)
 -- import qualified Web.Authenticate.Facebook as Facebook
 import Web.Routes
@@ -50,8 +50,8 @@ getIdentifier :: (Happstack m) => m Identifier
 getIdentifier =
     do pairs'      <- lookPairsBS
        let pairs = mapMaybe (\(k, ev) -> case ev of (Left _) -> Nothing ; (Right v) -> Just (T.pack k, TL.toStrict $ TL.decodeUtf8 v)) pairs'
-       (identifier, _) <- liftIO $ withManager $ authenticate pairs
-       return identifier
+       oir <- liftIO $ withManager $ authenticateClaimed pairs
+       return (oirOpLocal oir)
 
 -- calling this will log you in as 1 or more AuthIds
 -- problem.. if the Identifier is not associated with any Auths, then we are in trouble, because the identifier will be 'lost'.

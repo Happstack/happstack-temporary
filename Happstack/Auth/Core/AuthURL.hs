@@ -38,7 +38,7 @@ instance PathInfo OpenIdProvider where
 instance Arbitrary OpenIdProvider where
     arbitrary = oneof $ map return [ minBound .. maxBound ]
 
-data AuthMode 
+data AuthMode
     = LoginMode
     | AddIdentifierMode
       deriving (Eq, Ord, Read, Show, Data, Typeable)
@@ -52,8 +52,8 @@ instance PathInfo AuthMode where
              , do segment "add_identifier"
                   return AddIdentifierMode
              ]
-    
-      
+
+
 instance Arbitrary AuthMode where
     arbitrary = oneof [ return LoginMode
                       , return AddIdentifierMode
@@ -116,7 +116,7 @@ instance PathInfo AuthURL where
     toPathSegments A_ChangePassword = ["change_password"]
     toPathSegments A_AddAuth        = ["add_auth"]
     toPathSegments (A_OpenId o)     = "openid" : toPathSegments o
-    toPathSegments (A_OpenIdProvider authMode provider) = "provider" : toPathSegments authMode ++ toPathSegments provider 
+    toPathSegments (A_OpenIdProvider authMode provider) = "provider" : toPathSegments authMode ++ toPathSegments provider
     toPathSegments (A_Facebook authMode)         = "facebook"          : toPathSegments authMode
     toPathSegments (A_FacebookRedirect authMode) = "facebook-redirect" : toPathSegments authMode
 
