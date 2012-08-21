@@ -25,7 +25,7 @@ Library
                        Happstack.Auth.Core.AuthProfileURL
 
   Build-depends:       base                         > 4 && < 5,
-                       acid-state                   == 0.6.*,
+                       acid-state                   >= 0.6,
                        aeson                        >= 0.4 && < 0.7,
                        authenticate                 == 1.2.*,
                        blaze-html                   == 0.5.*,
