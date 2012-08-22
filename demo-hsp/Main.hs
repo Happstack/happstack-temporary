@@ -7,7 +7,10 @@ import Acid                              (Acid(..), withAcid)
 import Control.Concurrent                (forkIO, killThread)
 import Control.Monad                     (liftM, msum, mzero)
 import Control.Monad.Trans               (liftIO)
-import Data.Acid                         (query')
+import Control.Applicative
+import Data.Acid
+import Data.Acid.Advanced
+import Happstack.Server.Types
 import Happstack.Server                  ( Response(..), ServerPartT, ServerMonad(..), decodeBody
                                          , defaultBodyPolicy, dir, nullDir, ok, validateConf
                                          , seeOther, setValidatorSP, simpleHTTP, toResponse)
@@ -16,8 +19,7 @@ import HSP
 import qualified HSX.XMLGenerator as HSX
 import Pages.Home                        (homePage)
 import Happstack.Auth.Core.Auth          (AskAuthState(..))
-import Happstack.Auth.Core.ProfileURL    (ProfileURL(P_PickProfile))
-import Happstack.Auth.Blaze.Login        (handleAuth, handleProfile)
+import Happstack.Auth
 import ProfileData                       (ProfileDataURL(CreateNewProfileData), handleProfileData)
 import SiteURL                           (SiteURL(..))
 import System.Environment                (getArgs)
@@ -25,8 +27,9 @@ import System.Exit                       (exitFailure)
 import Web.Routes                        (Site(..), PathInfo(..), RouteT(..), setDefault, showURL, nestURL, parseSegments)
 import Web.Routes.Happstack              (implSite_)
 import Web.Routes.XMLGenT                ()
-import Text.Blaze                        (Html)
-import Text.Blaze.Renderer.String        (renderHtml)
+import Data.Text
+import Text.Blaze.Html                   (Html)
+import Text.Blaze.Html.Renderer.String   (renderHtml)
 
 -- the key to using happstack-authenticate with HSP is simple. First
 -- you need to be able to embed Html in your HSP monad like this:
@@ -34,16 +37,19 @@ instance (Functor m, Monad m) => EmbedAsChild (RouteT url m) Html where
     asChild html = asChild (CDATA False (renderHtml html))
 
 -- then you just provide a simple function like this to pass to the happstack-authenticate code
-defaultTemplate' :: (XMLGenerator m, EmbedAsChild m Html, HSX.XML m ~ XML) => String -> Html -> Html -> m Response
+defaultTemplate' :: (XMLGenerator m, EmbedAsChild m Html, HSX.XMLType m ~ XML) => String -> Html -> Html -> m Response
 defaultTemplate' t h b = liftM toResponse (defaultTemplate t h b)
 
+myConf :: Conf
+myConf = validateConf { port      = 8080 }
+
 main :: IO ()
-main = 
+main =
     do args <- getArgs
        case args of
          [baseURI] ->
              withAcid Nothing $ \acid ->
-               do tid <- forkIO $ simpleHTTP validateConf (setValidatorSP printResponse $ impl acid baseURI)
+               do tid <- forkIO $ simpleHTTP myConf (setValidatorSP printResponse $ impl acid (pack baseURI))
                   putStrLn "started. Press <enter> to exit."
                   _ <- getLine
                   killThread tid
@@ -72,30 +78,30 @@ printResponse res =
           showString "\nsfOffset    = " . shows      (sfOffset res)   .
           showString "\nsfCount     = " . shows      (sfCount res)
 
-impl :: Acid -> String -> ServerPartT IO Response
+impl :: Acid -> Text -> ServerPartT IO Response
 impl acid baseURI = do
     decodeBody (defaultBodyPolicy "/tmp/" 0 1000 1000)
     rq <- askRq
     liftIO $ print rq
-    msum [ do r <- implSite_ baseURI "web/" (spec acid (Just baseURI))
+    msum [ do r <- implSite_ baseURI (pack "web") (spec acid (Just baseURI))
               case r of
                 (Left e) -> liftIO (print e) >> mzero
                 (Right r) -> return r
-         , dir "dump_auth" $ do authState <- query' (acidAuth acid) AskAuthState 
+         , dir "dump_auth" $ do authState <- query' (acidAuth acid) AskAuthState
                                 ok $ toResponse (show authState)
-         , nullDir >> seeOther "/web/" (toResponse "")
+         , nullDir >> seeOther (pack "/web") (toResponse (pack ""))
          ]
 
-spec :: Acid -> Maybe String -> Site SiteURL (ServerPartT IO Response)
-spec acid realm = 
-    setDefault U_HomePage $ 
+spec :: Acid -> Maybe Text -> Site SiteURL (ServerPartT IO Response)
+spec acid realm =
+    setDefault U_HomePage $
       Site { handleSite          = \f u -> unRouteT (handle acid realm u) f
            , formatPathSegments  = \u -> (toPathSegments u, [])
            , parsePathSegments   = parseSegments fromPathSegments
            }
 
 -- TODO: use urlTemplate
-handle :: Acid -> Maybe String -> SiteURL -> RouteT SiteURL (ServerPartT IO) Response
+handle :: Acid -> Maybe Text -> SiteURL -> RouteT SiteURL (ServerPartT IO) Response
 handle acid@Acid{..} realm url =
     case url of
       U_HomePage          -> homePage acid

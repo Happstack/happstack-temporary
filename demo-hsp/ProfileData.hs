@@ -4,6 +4,7 @@ module ProfileData where
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Acid
+import Data.Acid.Advanced
 import Data.Generics
 import           Data.IxSet  (IxSet, (@=), getOne, inferIxSet, noCalcs)
 import qualified Data.IxSet  as IxSet

@@ -26,7 +26,7 @@ appTemplate' ::
     => String -- ^ title 
     -> headers  -- ^ extra tags to include in \<head\>
     -> body    -- ^ contents to put inside \<body\> 
-    -> XMLGenT m (HSX.XML m)
+    -> XMLGenT m (HSX.XMLType m)
 appTemplate' title headers body = do 
    <html>
      <head>
@@ -41,7 +41,7 @@ appTemplate' title headers body = do
 
 appTemplate :: 
     ( Happstack m
-    , ToMessage (HSX.XML m)
+    , ToMessage (HSX.XMLType m)
     , XMLGenerator m
     , EmbedAsChild m headers 
     , EmbedAsChild m body

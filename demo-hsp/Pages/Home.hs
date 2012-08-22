@@ -4,6 +4,7 @@ module Pages.Home where
 
 import Acid
 import Data.Acid
+import Data.Acid.Advanced
 import Data.Maybe
 import qualified Data.Text as Text
 import Happstack.Server
