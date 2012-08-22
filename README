@@ -1,0 +1,69 @@
+This library provides support for authentication and profiles. It
+currently supports authentication via OpenId, Facebook, or a
+username/password.
+
+happstack-authenticate is currently under documented. This README will
+attempt to give you a basic understanding of what is offered and where
+to start. We will definitely bring this component up to the same
+standards of documentation as the rest of Happstack as soon as
+possible.
+
+happstack-authenticate does not have a strict one-to-one mapping
+between authencation methonds and profiles. Instead it aims to allow
+for the situations.
+
+Imagine there is a popular new social network, flittr.
+
+
+ 1. you login via create a personal account for yourself on flittr using facebook.
+
+ 2. you decide to 'quit facebook' for a while, and so you add your
+    google openid account as a secondary authentication method.
+
+ 3. you decide to also create flittr accounts for your band, side business, dog, etc.
+
+On many popular sites today, step 3 can be rather annoying -- you must
+create separate accounts for each identity, often with separate
+registration emails, etc.
+
+happstack-authenticate aims to make this easier by allowing a single
+authentication method to be associated with multiple profiles (aka,
+accounts).
+
+So, the basic login process goes as follows:
+
+ 1. verify authentication credentials
+ 2. select the user profile associated with those credentials
+ 3. deal with profile data associated with a profile
+
+These phases are distinct and separated in the
+code. happstack-authenticate provides steps 1 and 2, while leaving
+step 3 up to the end user. This gives the end user completely control
+over what profile data is stored, and even where and how it is stored.
+
+Additionally, it is possible to use just the authenticate step from
+happstack-authenticate, and provide your own step 2. This is done by
+providing the authenticate step with an alternative continuation URL.
+
+Most users will not need this flexibility, and so it is bundled up
+automatically in handleAuthProfile.
+
+The best demo to look at is:
+
+   demo-blaze-web-routes
+
+If you do not want to use web-routes with your application then see:
+
+   demo-blaze
+
+While happstack-authenticate uses blaze internally, it is easy to use
+happstack-authenticate with different template solutions. All you need
+to do is embed the blaze-html fragments in the other template. For
+example:
+
+  demo-hsp
+
+Note also that demo-hsp explicitly calls handleAuth and handleProfile
+instead of using the unified handleAuthProfile handler. This should
+give you a clue as to how to call your own handle after successful
+authentication.
