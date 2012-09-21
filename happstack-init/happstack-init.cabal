@@ -49,7 +49,7 @@ data-files:          templates/project/COPYING
 source-repository head
     type:     darcs
     subdir:   happstack-init
-    location: http://patch-tag.com/r/mae/happstack
+    location: http://hub.darcs.net/stepcut/happstack
 
 Executable happstack
   ghc-options: -threaded

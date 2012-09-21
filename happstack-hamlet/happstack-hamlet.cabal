@@ -20,7 +20,7 @@ Extra-source-files:  demo.hs
 source-repository head
     type:     darcs
     subdir:   happstack-hamlet
-    location: http://patch-tag.com/r/mae/happstack/pullrepo
+    location: http://hub.darcs.net/stepcut/happstack/pullrepo
 
 Library
   Exposed-modules:     Happstack.Server.Hamlet
