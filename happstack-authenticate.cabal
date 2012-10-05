@@ -36,7 +36,7 @@ Library
                        http-conduit                 == 1.4.*,
                        http-types                   >= 0.6 && < 0.8,
                        fb                           == 0.9.*,
-                       safecopy                     == 0.6.*,
+                       safecopy                     >= 0.6,
                        mtl                          >= 2.0,
                        pwstore-purehaskell          == 2.1.*,
                        QuickCheck                   >= 2,
