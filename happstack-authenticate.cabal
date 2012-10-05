@@ -1,5 +1,5 @@
 Name:                happstack-authenticate
-Version:             0.9.4
+Version:             0.9.5
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
 Homepage:            http://src.seereason.com/happstack-authenticate
@@ -33,7 +33,7 @@ Library
                        containers                   >= 0.4 && < 0.6,
                        ixset                        >= 1.0 && < 1.1,
                        happstack-server             >= 6.0 && < 7.1,
-                       http-conduit                 == 1.4.*,
+                       http-conduit                 >= 1.4 && < 1.7,
                        http-types                   >= 0.6 && < 0.8,
                        fb                           == 0.9.*,
                        safecopy                     >= 0.6,
