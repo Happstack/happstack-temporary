@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeSynonymInstances, DeriveDataTypeable,
     FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleContexts,
-    UndecidableInstances, TypeOperators, RecordWildCards
+    UndecidableInstances, TypeOperators, RecordWildCards, StandaloneDeriving
     #-}
 module Happstack.Auth.Core.Auth
     ( UserPass(..)
@@ -67,6 +67,7 @@ import Data.Time.Clock               (UTCTime, addUTCTime, getCurrentTime,)
 import qualified Data.Text           as Text
 import qualified Data.Text.Encoding  as Text
 import           Data.Text           (Text)
+import Facebook                      (UserId, Id(..))
 import Network.HTTP.Types            (Ascii)
 import Web.Authenticate.OpenId       (Identifier)
 import Web.Routes                    (PathInfo(..))
@@ -133,13 +134,24 @@ $(deriveSafeCopy 1 'base ''Identifier)
 newtype FacebookId_001 = FacebookId_001 { unFacebookId_001 :: Text }
     deriving (Eq, Ord, Read, Show, Data, Typeable, SafeCopy)
 
-newtype FacebookId = FacebookId { unFacebookId :: Ascii }
+newtype FacebookId_002 = FacebookId_002 { unFacebookId_002 :: Ascii }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
-$(deriveSafeCopy 2 'extension ''FacebookId)
+$(deriveSafeCopy 2 'extension ''FacebookId_002)
+  
+instance Migrate FacebookId_002 where
+    type MigrateFrom FacebookId_002 = FacebookId_001
+    migrate (FacebookId_001 fid) = FacebookId_002 (Text.encodeUtf8 fid)
+
+deriving instance Data Id
+$(deriveSafeCopy 0 'base ''Id)
+
+newtype FacebookId = FacebookId { unFacebookId :: UserId }
+    deriving (Eq, Ord, Read, Show, Data, Typeable)
+$(deriveSafeCopy 3 'extension ''FacebookId)
 
 instance Migrate FacebookId where
-    type MigrateFrom FacebookId = FacebookId_001
-    migrate (FacebookId_001 fid) = FacebookId (Text.encodeUtf8 fid)
+    type MigrateFrom FacebookId = FacebookId_002
+    migrate (FacebookId_002 fid) = FacebookId (Id $ Text.decodeUtf8 fid)
 
 data AuthMethod_v1
     = AuthIdentifier_v1 { amIdentifier_v1 :: Identifier
