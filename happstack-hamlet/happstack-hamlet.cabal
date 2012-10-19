@@ -1,5 +1,5 @@
 Name:                happstack-hamlet
-Version:             7.0.1
+Version:             7.0.2
 Synopsis:            Support for Hamlet HTML templates in Happstack
 
 Description:         Happstack is a web application development framework.
@@ -25,8 +25,8 @@ source-repository head
 Library
   Exposed-modules:     Happstack.Server.Hamlet
   Build-depends:       base >= 3 && <5,
-                       happstack-server >= 6.0 && < 7.1,
-                       hamlet >= 0.10 && <1.1,
+                       happstack-server >= 6.0 && < 7.2,
+                       hamlet >= 0.10 && <1.2,
                        text
 
   -- Modules not exported by this package.
