@@ -19,22 +19,12 @@ handleCommand handler =
          (Just cmd) -> handler cmd
 
 fayResponse :: (Happstack m, Show a) =>
-             ResponseType a
-          -> m a
-          -> m Response
+               ResponseType a
+            -> m a
+            -> m Response
 fayResponse _rt m =
     do a <- m
        case showToFay a of
          Nothing -> internalServerError $ toResponse ("showToFay failed to convert response." :: String)
          (Just json) ->
              ok $ toResponseBS "application/json;charset=UTF-8" $ encode json
-
-{-
-toFayResponse :: (ToJSON a, Show a) =>
-                 a
-              -> Response
-toFayResponse a =
-    toResponseBS "application/json;charset=UTF-8" $
-      encode (showToFay a)
--}
-

@@ -1,18 +1,25 @@
 {-# LANGUAGE DeriveDataTypeable, NoImplicitPrelude #-}
+{- |
+
+client-side half of a typed AJAX communication channel.
+
+-}
 module Language.Fay.AJAX where
 
 import Language.Fay.FFI
 import Language.Fay.Prelude
 
+-- | 'ResponseType' is used in lieu of `GADTs` as a mechanism for
+-- specifying the expected return type of remote AJAX calls.
 data ResponseType a = ResponseType
     deriving (Eq, Read, Show, Data, Typeable)
 instance Foreign (ResponseType a)
 
 -- | Asynchronously call a command
 call :: (Foreign cmd, Foreign res) =>
-        String
-     -> (ResponseType res -> cmd)
-     -> (res -> Fay ())
+        String                    -- ^ URL to 'POST' AJAX request to
+     -> (ResponseType res -> cmd) -- ^ AJAX command to send to server
+     -> (res -> Fay ())           -- ^ callback function to handle response
      -> Fay ()
 call uri f g =
     ajaxCommand uri (f ResponseType) g

@@ -11,13 +11,16 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 data-files:
-  Language/Fay/AJAX.hs
+  Language/Fay/AJAX.hs,
+  Language/Fay/HTML.hs
 
 library
   exposed-modules:     Language.Fay.AJAX,
+                       Language.Fay.HTML,
                        Happstack.Fay,
                        Paths_happstack_fay
   build-depends:       base             > 4 && <5,
                        fay              == 0.9.*,
+                       fay-jquery       == 0.1.*,
                        aeson            == 0.6.*,
                        happstack-server >= 7.0 && <7.2
