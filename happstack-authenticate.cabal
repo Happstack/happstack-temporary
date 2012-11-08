@@ -2,7 +2,7 @@ Name:                happstack-authenticate
 Version:             0.9.6
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
-Homepage:            http://src.seereason.com/happstack-authenticate
+Homepage:            http://hub.darcs.net/stepcut/happstack-authentication
 License:             BSD3
 License-file:        LICENSE
 Author:              Jeremy Shaw.
@@ -11,6 +11,10 @@ Copyright:           2011 SeeReason Partners, LLC
 Category:            Web
 Build-type:          Simple
 Cabal-version:       >=1.6
+
+source-repository head
+    type:     darcs
+    location: http://hub.darcs.net/stepcut/happstack-authenticate
 
 Library
 
