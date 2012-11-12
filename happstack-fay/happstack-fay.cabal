@@ -1,6 +1,9 @@
 name:                happstack-fay
 version:             0.1.0.0
 synopsis:            Support for using Fay with Happstack
+description:         Fay is strict subset of Happstack which can be compiled
+                     to Javascript. This library provides some utilities for client-server
+                     communication, client-side HTML generation, and more.
 homepage:            http://www.happstack.com/
 license:             BSD3
 license-file:        LICENSE
