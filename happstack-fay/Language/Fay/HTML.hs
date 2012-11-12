@@ -1,20 +1,25 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{- |
+
+A simple library for client-side HTML generation.
+
+-}
 module Language.Fay.HTML where
 
 import Language.Fay.FFI
 import Language.Fay.Prelude
 import Language.Fay.JQuery
 
-createElement :: String -> Fay Element
-createElement = ffi "document.createElement(%1)"
 
+-- | ADT for 'HTML'
 data HTML
-    = Element String [(String, String)] [HTML]
-    | CDATA Bool String
+    = Element String [(String, String)] [HTML] -- ^ Element name attributes children
+    | CDATA Bool String                        -- ^ CDATA needEscaping value
 
-genElement :: String
-           -> [Fay (String, String)]
-           -> [Fay HTML]
+-- | generate an HTML element
+genElement :: String                  -- ^ Element name
+           -> [Fay (String, String)]  -- ^ list of attributes
+           -> [Fay HTML]              -- ^ list of children
            -> Fay HTML
 genElement n genAttrs genChildren =
     do attrs    <- sequence $ genAttrs
@@ -23,6 +28,8 @@ genElement n genAttrs genChildren =
 
 -- | render the 'HTML' into a JQuery DOM tree. You still need to
 -- append the result somewhere.
+--
+-- NOTE: This function requires 'jQuery'
 renderHTML :: HTML
            -> Fay JQuery
 renderHTML (Element n attrs children) =
@@ -36,16 +43,33 @@ renderHTML (Element n attrs children) =
 ------------------------------------------------------------------------------
 -- HTML Combinators
 
-tr :: [Fay (String, String)] -> [Fay HTML] -> Fay HTML
+-- | \<tr\>
+tr :: [Fay (String, String)] -- ^ attributes
+   -> [Fay HTML]             -- ^ children
+   -> Fay HTML
 tr = genElement "tr"
 
-td :: [Fay (String, String)] -> [Fay HTML] -> Fay HTML
+-- | \<td\>
+td :: [Fay (String, String)]  -- ^ attributes
+   -> [Fay HTML]              -- ^ children
+   -> Fay HTML
 td = genElement "td"
 
-span :: [Fay (String, String)] -> [Fay HTML] -> Fay HTML
+-- | \<span\>
+span :: [Fay (String, String)] -- ^ attributes
+     -> [Fay HTML]             -- ^ children
+     -> Fay HTML
 span = genElement "span"
 
+-- | create a text node from the 'String'. The 'String' will be
+-- automatically escaped.
 pcdata :: String -> Fay HTML
 pcdata = return . CDATA True
 
+------------------------------------------------------------------------------
+-- HTML Combinators
 
+-- | create a new 'Element'
+createElement :: String -- ^ name of the element
+              -> Fay Element
+createElement = ffi "document.createElement(%1)"
