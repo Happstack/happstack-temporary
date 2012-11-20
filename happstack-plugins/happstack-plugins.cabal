@@ -30,7 +30,7 @@ Library
   build-depends:       base             >= 3 && < 5,
                        plugins-auto     == 0.0.*,
                        mtl              >= 2.0 && <2.2,
-                       happstack-server >= 6   && <7.1,
+                       happstack-server >= 6   && <7.2,
                        template-haskell >= 2.6 && <2.8,
                        th-lift          == 0.5.*
 
