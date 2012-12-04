@@ -39,6 +39,15 @@ renderHTML (Element n attrs children) =
                   do cElem <- renderHTML child
                      append cElem elem) children
        return elem
+renderHTML (CDATA True str) =
+    selectElement =<< createTextNode str
+renderHTML (CDATA False str) =
+    do alert "Unsure how to insert pre-escaped text into the generated HTML."
+       selectElement =<< createTextNode str
+    where
+      -- | Alert using window.alert.
+      alert :: String -> Fay ()
+      alert = ffi "window.alert(%1)"
 
 ------------------------------------------------------------------------------
 -- HTML Combinators
@@ -73,3 +82,12 @@ pcdata = return . CDATA True
 createElement :: String -- ^ name of the element
               -> Fay Element
 createElement = ffi "document.createElement(%1)"
+
+-- | create a new text node
+--
+-- NOTE: this doesn't really return an Element. It returns a TextNode
+-- or something. But fay-jquery only supports the Element type...
+createTextNode :: String -- ^ text to insert in the node
+               -> Fay Element
+createTextNode = ffi "document.createTextNode(%1)"
+
