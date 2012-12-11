@@ -75,12 +75,13 @@ module HSX.JMacro where
 
 import Control.Monad.Trans                 (lift)
 import Control.Monad.State                 (MonadState(get,put))
+import Data.Text.Lazy                      (Text)
 import qualified Happstack.Server.HSP.HTML as HTML
 import Happstack.Server.HSP.HTML           (XML(..), Attribute(..), AttrValue(..))
 import HSX.XMLGenerator                    (XMLGenerator(..), XMLGen(..), EmbedAsChild(..), EmbedAsAttr(..), IsName(..), Attr(..), Name)
 import qualified HSP.Identity              as HSP
 import Language.Javascript.JMacro          (JStat(..), JExpr(..), JVal(..), Ident(..), ToJExpr(..), toStat, jmacroE, jLam, jVarTy, jsToDoc, jsSaturate, renderPrefixJs)
-import Text.PrettyPrint.HughesPJ           (Style(..), Mode(..), renderStyle, style)
+import Text.PrettyPrint.Leijen.Text        (Doc, displayT, renderOneLine)
 
 -- | This class provides a monotonically increasing supply of non-duplicate 'Integer' values
 class IntegerSupply m where
@@ -99,21 +100,17 @@ nextInteger' =
        put (succ i)
        return i
 
-instance (XMLGenerator m, IntegerSupply m) => EmbedAsChild m JStat where
+instance (XMLGenerator m, IntegerSupply m, EmbedAsChild m Text) => EmbedAsChild m JStat where
   asChild jstat =
       do i <- lift nextInteger
          asChild $ genElement (Nothing, "script")
                     [asAttr ("type" := "text/javascript")]
-                    [asChild (renderStyle lineStyle $ renderPrefixJs (show i) jstat)]
-      where
-        lineStyle = style { mode= OneLineMode }
+                    [asChild (displayT $ renderOneLine $ renderPrefixJs (show i) jstat)]
 
-instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name String)) => EmbedAsAttr m (Attr n JStat) where
+instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name Text)) => EmbedAsAttr m (Attr n JStat) where
   asAttr (n := jstat) =
       do i <- lift nextInteger
-         asAttr $ (toName n := (renderStyle lineStyle $ renderPrefixJs (show i) jstat))
-      where
-        lineStyle = style { mode= OneLineMode }
+         asAttr $ (toName n := (displayT $ renderOneLine $ renderPrefixJs (show i) jstat))
 
 -- | Provided for convenience since @Ident@ is exported by both
 -- @HSP.Identity@ and @JMacro@.  Using this you can avoid the need for an
