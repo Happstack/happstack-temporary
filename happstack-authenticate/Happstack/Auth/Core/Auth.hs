@@ -28,7 +28,6 @@ module Happstack.Auth.Core.Auth
     , AskAuthToken(..)
     , UpdateAuthToken(..)
     , DeleteAuthToken(..)
-    , AuthTokenAuthId(..)
     , GenAuthId(..)
     , AddAuthMethod(..)
     , NewAuthMethod(..)
@@ -48,7 +47,7 @@ module Happstack.Auth.Core.Auth
 import Control.Applicative           (Alternative, (<$>), optional)
 import Control.Monad                 (replicateM)
 import Control.Monad.Reader          (ask)
-import Control.Monad.State           (get, put)
+import Control.Monad.State           (get, put, modify)
 import Control.Monad.Trans           (MonadIO(..))
 import Crypto.PasswordStore
 import Data.Acid
@@ -57,21 +56,20 @@ import Data.ByteString               (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Data                     (Data, Typeable)
 import qualified Data.IxSet          as IxSet
-import           Data.IxSet          (IxSet, (@=), inferIxSet, noCalcs, getOne, updateIx)
+import           Data.IxSet          (Indexable(..), IxSet, (@=), inferIxSet, noCalcs, inferIxSet, ixFun, ixSet, noCalcs, getOne, updateIx)
 import Data.Map                      (Map)
 import qualified Data.Map            as Map
 import Data.SafeCopy -- (base, deriveSafeCopy)
 import           Data.Set            (Set)
 import qualified Data.Set            as Set
-import Data.Time.Clock               (UTCTime, addUTCTime, getCurrentTime,)
+import Data.Time.Clock               (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import qualified Data.Text           as Text
 import qualified Data.Text.Encoding  as Text
 import           Data.Text           (Text)
 import Facebook                      (UserId, Id(..))
-import Network.HTTP.Types            (Ascii)
 import Web.Authenticate.OpenId       (Identifier)
 import Web.Routes                    (PathInfo(..))
-import Happstack.Server              (CookieLife(..), Happstack, addCookie, expireCookie, lookCookieValue, mkCookie)
+import Happstack.Server              (Cookie(..), CookieLife(..), Happstack, Request(rqSecure), addCookie, askRq, expireCookie, lookCookieValue, mkCookie)
 
 newtype AuthId = AuthId { unAuthId :: Integer }
       deriving (Eq, Ord, Read, Show, Data, Typeable)
@@ -134,10 +132,10 @@ $(deriveSafeCopy 1 'base ''Identifier)
 newtype FacebookId_001 = FacebookId_001 { unFacebookId_001 :: Text }
     deriving (Eq, Ord, Read, Show, Data, Typeable, SafeCopy)
 
-newtype FacebookId_002 = FacebookId_002 { unFacebookId_002 :: Ascii }
+newtype FacebookId_002 = FacebookId_002 { unFacebookId_002 :: B.ByteString }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
 $(deriveSafeCopy 2 'extension ''FacebookId_002)
-  
+
 instance Migrate FacebookId_002 where
     type MigrateFrom FacebookId_002 = FacebookId_001
     migrate (FacebookId_001 fid) = FacebookId_002 (Text.encodeUtf8 fid)
@@ -179,6 +177,7 @@ instance Migrate AuthMethod where
     migrate (AuthUserPassId_v1 up)    = AuthUserPassId up
 
 
+-- | This links an authentication method (such as on OpenId 'Identifier', a 'FacebookId', or 'UserPassId') to an 'AuthId'.
 data AuthMap
     = AuthMap { amMethod :: AuthMethod
               , amAuthId :: AuthId
@@ -191,18 +190,37 @@ $(inferIxSet "AuthMaps" ''AuthMap 'noCalcs [''AuthId, ''AuthMethod, ''Identifier
 
 -- * AuthToken
 
+data AuthToken_001
+    = AuthToken_001 { tokenString_001     :: String
+                    , tokenExpires_001    :: UTCTime
+                    , tokenAuthId_001     :: Maybe AuthId
+                    , tokenAuthMethod_001 :: AuthMethod
+                    }
+      deriving (Eq, Ord, Data, Show, Typeable)
+$(deriveSafeCopy 1 'base ''AuthToken_001)
+
+
 data AuthToken
     = AuthToken { tokenString     :: String
                 , tokenExpires    :: UTCTime
+                , tokenLifetime   :: Int
                 , tokenAuthId     :: Maybe AuthId
                 , tokenAuthMethod :: AuthMethod
                 }
       deriving (Eq, Ord, Data, Show, Typeable)
-$(deriveSafeCopy 1 'base ''AuthToken)
+$(deriveSafeCopy 2 'extension ''AuthToken)
 
-$(inferIxSet "AuthTokens" ''AuthToken 'noCalcs [''String, ''AuthId])
+instance Migrate AuthToken where
+    type MigrateFrom AuthToken = AuthToken_001
+    migrate (AuthToken_001 ts te tid tam) =
+        (AuthToken ts te 3600 tid tam)
 
+instance Indexable AuthToken where
+    empty = ixSet [ ixFun $ (:[]) . tokenString
+                  , ixFun $ (:[]) . tokenAuthId
+                  ]
 
+type AuthTokens = IxSet AuthToken
 
 -- * AuthState
 
@@ -213,15 +231,31 @@ $(inferIxSet "AuthTokens" ''AuthToken 'noCalcs [''String, ''AuthId])
 -- Basically we can expired them on: logout and time
 --
 -- time is tricky because we do not really want to do a db update everytime they access the site
+data AuthState_1
+    = AuthState_1 { userPasses_1      :: UserPasses
+                , nextUserPassId_1  :: UserPassId
+                , authMaps_1        :: AuthMaps
+                , nextAuthId_1      :: AuthId
+                , authTokens_1      :: AuthTokens
+                }
+      deriving (Data, Eq, Show, Typeable)
+$(deriveSafeCopy 1 'base ''AuthState_1)
+
 data AuthState
     = AuthState { userPasses      :: UserPasses
                 , nextUserPassId  :: UserPassId
                 , authMaps        :: AuthMaps
                 , nextAuthId      :: AuthId
                 , authTokens      :: AuthTokens
+                , defaultSessionTimeout  :: Int
                 }
       deriving (Data, Eq, Show, Typeable)
-$(deriveSafeCopy 1 'base ''AuthState)
+$(deriveSafeCopy 2 'extension ''AuthState)
+
+instance Migrate AuthState where
+    type MigrateFrom AuthState = AuthState_1
+    migrate (AuthState_1 up nup am nai at) =
+        (AuthState up nup am nai at (60*60))
 
 -- | a reasonable initial 'AuthState'
 initialAuthState :: AuthState
@@ -231,6 +265,7 @@ initialAuthState =
               , authMaps        = IxSet.empty
               , authTokens      = IxSet.empty
               , nextAuthId      = AuthId 1
+              , defaultSessionTimeout  = 60*60
               }
 
 -- ** UserPass
@@ -376,6 +411,17 @@ userPassIdAuthIds upid =
     do as@(AuthState{..}) <- ask
        return $ Set.map amAuthId $ IxSet.toSet $ authMaps @= upid
 
+-- * Default timeout
+
+setDefaultSessionTimeout :: Int -- ^ default timout in seconds (should be >= 180)
+               -> Update AuthState ()
+setDefaultSessionTimeout newTimeout =
+    modify $ \as@AuthState{..} -> as { defaultSessionTimeout = newTimeout }
+
+getDefaultSessionTimeout :: Query AuthState Int
+getDefaultSessionTimeout =
+    defaultSessionTimeout <$> ask
+
 -- * AuthToken
 
 
@@ -401,31 +447,22 @@ deleteAuthToken tokenStr =
     do as@AuthState{..} <- get
        put (as { authTokens = IxSet.deleteIx tokenStr authTokens })
 
+purgeExpiredTokens :: UTCTime
+                   -> Update AuthState ()
+purgeExpiredTokens now =
+    do as@AuthState{..} <- get
+       let authTokens' = IxSet.fromList $ filter (\at -> (tokenExpires at) > now) (IxSet.toList authTokens)
+       put as { authTokens = authTokens'}
+
+-- | deprecated
+--
+-- this function is deprecated because it is not possible to check if the session has expired
 authTokenAuthId :: String -> Query AuthState (Maybe AuthId)
 authTokenAuthId tokenString =
     do as@(AuthState{..}) <- ask
        case getOne $ authTokens @= tokenString of
          Nothing          -> return Nothing
          (Just authToken) -> return $ (tokenAuthId authToken)
-
--- TODO:
---  - expireAuthTokens
---  - tickleAuthToken
-
--- | generate an new authentication token
-genAuthToken :: (MonadIO m) => Maybe AuthId -> AuthMethod -> Int -> m AuthToken
-genAuthToken aid authMethod lifetime =
-    do random <- liftIO $ B.unpack . exportSalt <$> genSaltIO -- the docs promise that the salt will be base64, so 'B.unpack' should be safe
-       now <- liftIO $ getCurrentTime
-       let expires = addUTCTime (fromIntegral lifetime) now
-           prefix = case aid of
-                      Nothing  -> "0"
-                      (Just a) -> show (unAuthId a)
-       return $ AuthToken { tokenString     = prefix ++ random
-                          , tokenExpires    = expires
-                          , tokenAuthId     = aid
-                          , tokenAuthMethod = authMethod
-                          }
 
 -- | generate a new, unused 'AuthId'
 genAuthId :: Update AuthState AuthId
@@ -438,34 +475,67 @@ askAuthState :: Query AuthState AuthState
 askAuthState = ask
 
 $(makeAcidic ''AuthState [ 'askUserPass
-                        , 'checkUserPass
-                        , 'createUserPass
-                        , 'setUserName
-                        , 'setPassword
-                        , 'addAuthToken
-                        , 'askAuthToken
-                        , 'updateAuthToken
-                        , 'deleteAuthToken
-                        , 'authTokenAuthId
-                        , 'genAuthId
-                        , 'addAuthMethod
-                        , 'newAuthMethod
-                        , 'removeAuthIdentifier
-                        , 'identifierAuthIds
-                        , 'facebookAuthIds
-                        , 'addAuthUserPassId
-                        , 'removeAuthUserPassId
-                        , 'userPassIdAuthIds
-                        , 'askAuthState
+                         , 'checkUserPass
+                         , 'createUserPass
+                         , 'setUserName
+                         , 'setPassword
+                         , 'addAuthToken
+                         , 'askAuthToken
+                         , 'updateAuthToken
+                         , 'deleteAuthToken
+                         , 'purgeExpiredTokens
+                         , 'authTokenAuthId
+                         , 'genAuthId
+                         , 'addAuthMethod
+                         , 'newAuthMethod
+                         , 'removeAuthIdentifier
+                         , 'identifierAuthIds
+                         , 'facebookAuthIds
+                         , 'addAuthUserPassId
+                         , 'removeAuthUserPassId
+                         , 'userPassIdAuthIds
+                         , 'askAuthState
+                         , 'setDefaultSessionTimeout
+                         , 'getDefaultSessionTimeout
                         ])
 
 -- * happstack-server level stuff
 
-addAuthCookie :: (Happstack m) => AcidState AuthState -> Maybe AuthId -> AuthMethod -> m ()
+-- TODO:
+--  - expireAuthTokens
+--  - tickleAuthToken
+
+-- | generate an new authentication token
+--
+genAuthToken :: (MonadIO m) => Maybe AuthId -> AuthMethod -> Int -> m AuthToken
+genAuthToken aid authMethod lifetime =
+    do random <- liftIO $ B.unpack . exportSalt <$> genSaltIO -- the docs promise that the salt will be base64, so 'B.unpack' should be safe
+       now <- liftIO $ getCurrentTime
+       let expires = addUTCTime (fromIntegral lifetime) now
+           prefix = case aid of
+                      Nothing  -> "0"
+                      (Just a) -> show (unAuthId a)
+       return $ AuthToken { tokenString     = prefix ++ random
+                          , tokenExpires    = expires
+                          , tokenLifetime   = lifetime
+                          , tokenAuthId     = aid
+                          , tokenAuthMethod = authMethod
+                          }
+
+-- Also calls 'PurgeExpiredTokens'
+addAuthCookie :: (Happstack m) =>
+                 AcidState AuthState
+              -> Maybe AuthId
+              -> AuthMethod
+              -> m ()
 addAuthCookie acidH aid authMethod =
-    do authToken <- genAuthToken aid authMethod (60*60)
+    do lifetime <- query' acidH GetDefaultSessionTimeout
+       authToken <- genAuthToken aid authMethod lifetime
+       now <- liftIO $ getCurrentTime
+       update' acidH (PurgeExpiredTokens now)
        update' acidH (AddAuthToken authToken)
-       addCookie Session (mkCookie "authToken" (tokenString authToken))
+       s <- rqSecure <$> askRq
+       addCookie Session ((mkCookie "authToken" (tokenString authToken)) { secure = s })
        return ()
 
 deleteAuthCookie :: (Happstack m, Alternative m) => AcidState AuthState -> m ()
@@ -476,18 +546,39 @@ deleteAuthCookie acidH =
          (Just tokenStr) ->
              do expireCookie "authToken"
                 update' acidH (DeleteAuthToken tokenStr)
-
+{-
+getAuthCookie :: (Alternative m, Happstack m) =>
+                 AcidState AuthState
+              -> m (Maybe AuthToken)
+getAuthCookie acidH =
+    do mTokenStr <- optional $ lookCookieValue "authToken"
+-}
 getAuthToken :: (Alternative m, Happstack m) => AcidState AuthState -> m (Maybe AuthToken)
 getAuthToken acidH =
     do mTokenStr <- optional $ lookCookieValue "authToken"
        case mTokenStr of
-         Nothing -> return Nothing
+         Nothing         -> return Nothing
          (Just tokenStr) ->
-             query' acidH (AskAuthToken tokenStr)
+           do mAuthToken <- query' acidH (AskAuthToken tokenStr)
+              case mAuthToken of
+                Nothing -> return Nothing
+                (Just authToken) ->
+                    do now <- liftIO $ getCurrentTime
+                       if now > (tokenExpires authToken)
+                         then do expireCookie "authToken"
+                                 update' acidH (DeleteAuthToken tokenStr)
+                                 return Nothing
+                         else if (diffUTCTime (addUTCTime (fromIntegral $ tokenLifetime authToken) now) (tokenExpires authToken)) > 60
+                                then do let newAuthToken = authToken { tokenExpires = addUTCTime (fromIntegral $ tokenLifetime authToken) now }
+                                        update' acidH (UpdateAuthToken newAuthToken)
+                                        return (Just newAuthToken)
+                                else return (Just authToken)
+
 
 getAuthId :: (Alternative m, Happstack m) => AcidState AuthState -> m (Maybe AuthId)
 getAuthId acidH =
-    do mTokenStr <- optional $ lookCookieValue "authToken"
-       case mTokenStr of
-         Nothing         -> return Nothing
-         (Just tokenStr) -> query' acidH (AuthTokenAuthId tokenStr)
+    do mAuthToken <- getAuthToken acidH
+       case mAuthToken of
+         Nothing -> return Nothing
+         (Just authToken) ->
+             return $ (tokenAuthId authToken)

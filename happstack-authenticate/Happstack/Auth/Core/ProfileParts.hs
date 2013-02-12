@@ -18,7 +18,7 @@ import Web.Routes.Happstack
 
 pickAuthId :: (Happstack m, Alternative m) => AcidState AuthState -> m (Either (Set AuthId) AuthId)
 pickAuthId authStateH =
-    do (Just authToken) <- getAuthToken authStateH -- FIXME: Just 
+    do (Just authToken) <- getAuthToken authStateH -- FIXME: Just
        case tokenAuthId authToken of
          (Just authId) -> return (Right authId)
          Nothing ->
@@ -48,7 +48,7 @@ setAuthIdPage authStateH authId =
                            return True
                    else return False
 
-data PickProfile 
+data PickProfile
     = Picked UserId
     | PickPersonality (Set Profile)
     | PickAuthId      (Set AuthId)

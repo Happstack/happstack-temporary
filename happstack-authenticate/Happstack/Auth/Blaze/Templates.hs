@@ -371,15 +371,18 @@ authProfileSite acidAuth acidProfile appTemplate mFacebook realm postPickedURL
            , parsePathSegments  = parseSegments fromPathSegments
            }
 
+-- | this is a simple entry point into @happstack-authenticate@ that
+-- provides reasonable default behavior. A majority of the time you
+-- will just call this function.
 authProfileHandler :: (Happstack m) =>
-                      Text
-                   -> Text
-                   -> AcidState AuthState
-                   -> AcidState ProfileState
-                   -> (String  -> Html -> Html -> m Response)
-                   -> Maybe Credentials
-                   -> Maybe Text
-                   -> Text
+                      Text -- ^ baseURI for this server part
+                   -> Text -- ^ unique path prefix
+                   -> AcidState AuthState                     -- ^ handle for 'AcidState AuthState'
+                   -> AcidState ProfileState                  -- ^ handle for 'AcidState ProfileState'
+                   -> (String  -> Html -> Html -> m Response) -- ^ template function used to render pages
+                   -> Maybe Credentials                       -- ^ optional Facebook 'Credentials'
+                   -> Maybe Text                              -- ^ optional realm to use for @OpenId@ authentication
+                   -> Text                                    -- ^ url to redirect to if authentication and profile selection is successful
                    -> m Response
 authProfileHandler baseURI pathPrefix acidAuth acidProfile appTemplate mFacebook realm postPickedURL =
     do r <- implSite_ baseURI pathPrefix (authProfileSite acidAuth acidProfile appTemplate mFacebook realm postPickedURL)
