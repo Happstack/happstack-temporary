@@ -10,15 +10,15 @@ module Happstack.Server.Heist
     ) where
 
 import Blaze.ByteString.Builder                (toLazyByteString)
-import Control.Monad                           (MonadPlus(mzero), msum)
-import Control.Monad.Trans                     (MonadIO)
+import Control.Monad                           (MonadPlus(mzero), msum, liftM)
+import Control.Monad.Trans                     (MonadIO(liftIO))
 import           Data.ByteString.Char8         (ByteString)
 import qualified Data.ByteString.Char8         as B
 import qualified Data.ByteString.Lazy          as L
 import Happstack.Server                        (Response, ServerMonad, askRq, nullDir, rqPaths, toResponseBS)
 import System.FilePath                         (joinPath)
-import Text.Templating.Heist                   (renderTemplate)
-import Text.Templating.Heist.TemplateDirectory (TemplateDirectory, getDirectoryTS, reloadTemplateDirectory)
+import Heist.Compiled                          (renderTemplate)
+import Heist.TemplateDirectory (TemplateDirectory, getDirectoryHS, reloadTemplateDirectory)
 
 -- | serve the heist templates from the 'TemplateDirectory m'
 templateServe :: (ServerMonad m, MonadPlus m, MonadIO m) =>
@@ -36,7 +36,7 @@ templateReloader :: (MonadIO m, MonadIO n) =>
                     TemplateDirectory m
                  -> n Response
 templateReloader td = do
-    e <- reloadTemplateDirectory td
+    e <- liftIO $ reloadTemplateDirectory td
     return $ toResponseBS (B.pack "text/plain; charset=utf-8") $
         L.fromChunks [either B.pack (const $ B.pack "Templates loaded successfully.") e]
 
@@ -47,7 +47,7 @@ render:: (MonadPlus m, MonadIO m) =>
       -> ByteString           -- ^ template name
       -> m Response
 render td template = do
-    ts    <- getDirectoryTS td
-    t     <- renderTemplate ts template
-    flip (maybe mzero) t $ \(builder, mimeType) -> do
-        return (toResponseBS mimeType (toLazyByteString builder))
+    ts    <- liftIO $ getDirectoryHS td
+    let t = renderTemplate ts template
+    flip (maybe mzero) t $ \(builder, mimeType) ->
+      liftM (toResponseBS mimeType . toLazyByteString) builder
