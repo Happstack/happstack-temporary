@@ -211,9 +211,10 @@ myspacePage appTemplate here authMode =
                 seeOther (Text.unpack u) (toResponse ())
 
       where
-        usernameForm :: (Functor m, Monad m) => AuthForm m Text
+        usernameForm :: (Functor m, MonadIO m) => AuthForm m Text
         usernameForm =
-            label ("http://www.myspace.com/" :: String) ++> inputText mempty <* (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Login")
+              divInline (label' "http://www.myspace.com/" ++> inputText mempty)
+           <* (divFormActions $ inputSubmit' "Login")
 
 
 liveJournalPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
@@ -236,10 +237,10 @@ liveJournalPage appTemplate here authMode =
              do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just $ smap livejournal username)]
                 seeOther (Text.unpack u) (toResponse ())
 
-liveJournalForm :: (Functor m, Monad m) => AuthForm m Text
+liveJournalForm :: (Functor m, MonadIO m) => AuthForm m Text
 liveJournalForm =
-    label ("http://" :: String) ++> inputText mempty <++ label (".livejournal.com/" :: String) <*
-    (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Connect")
+      divInline (label' "http://" ++> inputText mempty <++ label' ".livejournal.com/")
+   <* divFormActions (inputSubmit' "Connect")
 
 genericOpenIdPage :: (Happstack m, MonadRoute m, URL m ~ AuthURL) =>
                      (String -> Html -> Html -> m Response)
@@ -260,9 +261,10 @@ genericOpenIdPage appTemplate here authMode =
              do u <- showURLParams (A_OpenId (O_Connect authMode)) [("url", Just url)]
                 seeOther (Text.unpack u) (toResponse ())
       where
-        openIdURLForm :: (Functor m, Monad m) => AuthForm m Text
+        openIdURLForm :: (Functor m, MonadIO m) => AuthForm m Text
         openIdURLForm =
-            label ("Your OpenId url: " :: String) ++> inputText mempty <* inputSubmit "Connect"
+            divInline (label' ("Your OpenId url: " :: String) ++> inputText mempty) <*
+            divFormActions (inputSubmit "Connect")
 
 -- | Function which takes care of all 'AuthURL' routes.
 --
@@ -443,16 +445,16 @@ localLoginPage authStateH appTemplate here onAuthURL =
 
       where
         loginForm createURL =
-            R.fieldset $
-             (errorList ++>
-               R.ol (((,) <$> (R.li $ errorList ++> label ("username: " :: String) ++> inputText mempty)
-                          <*> (R.li $ errorList ++> label ("password: " :: String) ++> inputPassword)
-                          <* login) `transformEitherM` checkAuth)
-                    <* (create createURL))
+            divHorizontal $
+             fieldset $
+              (errorList ++>
+                (((,) <$> (divControlGroup $ errorList ++> label' "username: " ++> divControls (inputText mempty))
+                      <*> (divControlGroup $ errorList ++> label' "password: " ++> divControls (inputPassword))
+                           <* divFormActions (inputSubmit' "Login")) `transformEitherM` checkAuth)
+                      <* (create createURL))
 
         create createURL = view $ p $ do "or "
                                          H.a ! href (toValue createURL) $ "create a new account"
-        login = li $ mapView (\html -> html ! A.class_  "submit") (inputSubmit "Login")
 
         checkAuth :: (MonadIO m) => (Text, Text) -> m (Either AuthTemplateError UserPassId)
         checkAuth (username, password) =
@@ -480,16 +482,17 @@ createAccountPage authStateH appTemplate onAuthURL here =
 
 newAccountForm :: (Functor v, MonadIO v) => AcidState AuthState -> AuthForm v (AuthId, UserPassId)
 newAccountForm authStateH =
-    (R.fieldset
-     (errorList ++>
-      (R.ol $ (((,) <$> username <*> password <* submitButton)))
-                    `transformEitherM`
-                    createAccount))
+    divHorizontal $
+     (R.fieldset
+      (errorList ++>
+       (((,) <$> username <*> password <* submitButton)))
+                     `transformEitherM`
+                     createAccount)
     where
-      submitButton = R.li $ (mapView (\html -> html ! A.class_  "submit") $ inputSubmit "Create Account")
-      username  = R.li $ errorList ++> ((label ("username: " :: String)       ++> inputText mempty) `transformEither` (minLength 1))
-      password1 = R.li $ label ("password: " :: String)         ++> inputPassword
-      password2 = R.li $ label ("confirm password: " :: String) ++> inputPassword
+      submitButton = divFormActions $ inputSubmit' "Create Account"
+      username  = divControlGroup $ errorList ++> ((label' "username: " ++> divControls (inputText mempty)) `transformEither` (minLength 1))
+      password1 = divControlGroup $ label' "password: "          ++> divControls inputPassword
+      password2 = divControlGroup $ label' "confirm password: "  ++> divControls inputPassword
 
       password =
           errorList ++> (((,) <$> password1 <*> password2) `transformEither` samePassword) `transformEither` minLength 6
@@ -534,7 +537,7 @@ changePasswordPage authStateH appTemplate here =
                                                  H.div ! A.id "happstack-authenticate" $
                                                      do h1 $ do "Change password for "
                                                                 toHtml $ unUserName $ upName userPass
-                                                                formHtml
+                                                        formHtml
                                        ok r
                                  (Right passwd) ->
                                     do hashedPass <- liftIO $ mkHashedPass passwd
@@ -553,12 +556,14 @@ changePasswordPage authStateH appTemplate here =
 
 changePasswordForm  :: (Functor v, MonadIO v) => AcidState AuthState -> UserPass -> AuthForm v Text
 changePasswordForm authStateH userPass =
-    fieldset $ ol $ oldPassword *> newPassword <* changeBtn
+    divHorizontal $
+     fieldset $
+      oldPassword *> newPassword <* changeBtn
     where
       -- form elements
       oldPassword =
           errorList ++>
-          (li $  label ("old password: " :: String) ++> inputPassword `transformEitherM` checkAuth)
+          (divControlGroup $ label' "old password: " ++> divControls inputPassword) `transformEitherM` checkAuth
 
       checkAuth password =
               do r <- query' authStateH (CheckUserPass (unUserName $ upName userPass) password)
@@ -566,11 +571,11 @@ changePasswordForm authStateH userPass =
                    (Left e)  -> return (Left $ UPE e)
                    (Right _) -> return (Right password)
 
-      password1, password2 :: (Functor v, Monad v) => AuthForm v Text
-      password1 = li $ label ("new password: "         :: String) ++> inputPassword
-      password2 = li $ label ("new confirm password: " :: String) ++> inputPassword
+      password1, password2 :: (Functor v, MonadIO v) => AuthForm v Text
+      password1 = divControlGroup $ label' "new password: "         ++> divControls inputPassword
+      password2 = divControlGroup $ label' "new confirm password: " ++> divControls inputPassword
 
-      newPassword :: (Functor v, Monad v) => AuthForm v Text
+      newPassword :: (Functor v, MonadIO v) => AuthForm v Text
       newPassword =
           errorList ++>
            (((((,) <$> password1 <*> password2)) `transformEither` samePassword) `transformEither` minLength 6)
@@ -581,11 +586,49 @@ changePasswordForm authStateH userPass =
                then (Left $ PasswordMismatch)
                else (Right p1)
 
-      changeBtn :: (Functor v, Monad v) => AuthForm v (Maybe Text)
-      changeBtn = li $ mapView (\html -> html ! A.class_  "submit") $ inputSubmit "change"
+      changeBtn :: (Functor v, MonadIO v) => AuthForm v (Maybe Text)
+      changeBtn = divFormActions $ inputSubmit' "change" -- li $ mapView (\html -> html ! A.class_  "submit") $ inputSubmit "change"
 
 minLength :: Int -> Text -> Either AuthTemplateError Text
 minLength n s =
           if Text.length s >= n
           then (Right s)
           else (Left $ MinLength n)
+
+
+divControlGroup :: (Functor m, MonadIO m) => AuthForm m a -> AuthForm m a
+divControlGroup = mapView (\html -> H.div ! class_ "control-group" $ html)
+
+divControls :: (Functor m, MonadIO m) => AuthForm m a -> AuthForm m a
+divControls = mapView (\html -> H.div ! class_ "controls" $ html)
+
+label' :: (Functor m, MonadIO m) => String -> AuthForm m ()
+label' str = mapView (\html -> html ! class_"control-label") (R.label str)
+
+divHorizontal :: (Functor m, MonadIO m) => AuthForm m a -> AuthForm m a
+divHorizontal = mapView (\html -> H.div ! class_ "form-horizontal" $ html)
+
+divInline :: (Functor m, MonadIO m) => AuthForm m a -> AuthForm m a
+divInline = mapView (\html -> H.div ! class_ "form-inline" $ html)
+
+divFormActions :: (Functor m, MonadIO m) => AuthForm m a -> AuthForm m a
+divFormActions = mapView (\html -> H.div ! class_ "form-actions" $ html)
+
+inputSubmit' :: (Functor m, MonadIO m) => Text -> AuthForm m (Maybe Text)
+inputSubmit' str = mapView (\html -> html ! class_ "btn") (R.inputSubmit str)
+
+{-
+inputSubmit' str = inputSubmit str `setAttrs` [("class":="btn")]
+inputCheckboxLabel lbl b =
+    mapView (\xml -> [<label class="checkbox"><% xml %><% lbl %></label>])
+                (inputCheckbox b)
+
+label' str       = (label str `setAttrs` [("class":="control-label")])
+
+labelCB str      = label str `setAttrs` [("class":="checkbox")]
+--  divInline        = mapView (\xml -> [<div class="checkbox inline"><% xml %></div>])
+divFormActions   = mapView (\xml -> [<div class="form-actions"><% xml %></div>])
+divHorizontal    = mapView (\xml -> [<div class="form-horizontal"><% xml %></div>])
+divControlGroup  = mapView (\xml -> [<div class="control-group"><% xml %></div>])
+divControls      = mapView (\xml -> [<div class="controls"><% xml %></div>])
+-}
