@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, NoImplicitPrelude, PackageImports  #-}
 {- |
 
 The server-side half of a typed AJAX communication channel.
@@ -42,16 +42,24 @@ command handler to a valid Fay value. Note that it takes
 'ResponseType' argument and passes it to 'fayResponse'. This is how we
 ensure that each commend handler is returning the right type.
 
-See also "Language.Fay.AJAX".
+See also @AJAX@ from the @happstack-client-fay@ package.
 
 -}
 module Happstack.Fay where
 
+-- NOTE: we do not really need to use NoImplicitPrelude and
+-- PackageImports here since this module only needs things from "base"
+-- and we do not compile against "fay-base". However, when debugging
+-- things in GHCi, we might have both "base" and "fay-base"
+-- loaded. So, using PackageImports just makes things easier.
+
+import "base" Prelude
+import Control.Monad.Trans (liftIO)
 import Data.Aeson
-import Data.Data
+import "base" Data.Data
 import Happstack.Server
-import Language.Fay.AJAX
-import Language.Fay.Convert
+import ResponseType
+import Fay.Convert
 
 -- | decode the 'cmd' and call the response handler.
 --
@@ -61,8 +69,11 @@ handleCommand :: (Data cmd, Show cmd, Happstack m) =>
               -> m Response
 handleCommand handler =
     do json <- lookBS "json"
+       liftIO $ print json
        let val = (decode' json)
            mCmd = readFromFay =<< val
+       liftIO $ print val
+       liftIO $ print mCmd
        case mCmd of
          Nothing    -> badRequest $ toResponse ("Failed to turn this into a command: " ++ show (val))
          (Just cmd) -> handler cmd

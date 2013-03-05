@@ -1,15 +1,37 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 {- |
 
-A simple library for client-side HTML generation.
+A simple library for client-side HTML generation. Compatible with hsx2hs.
 
 -}
-module Language.Fay.HTML where
+module HTML where
 
-import Language.Fay.FFI
-import Language.Fay.Prelude
-import Language.Fay.JQuery
+import Prelude
+import JQuery
+import FFI
 
+type Text = String
+
+data Attr a b = a := b
+
+
+-- | type class for embedding values as HTML children
+--
+-- since Fay does not yet support type-class methods we have to fake it via the ffi
+class AsChild a             -- where asChild :: a -> Fay HTML
+instance AsChild [Char]     -- where asChild s = return (CDATA True s)
+instance AsChild (Fay HTML) -- where asChild = id
+
+-- and here is the scary ffi code.
+asChild :: (AsChild a) => a -> Fay HTML
+asChild =
+    ffi "(function () { if (%1 instanceof Fay$$Cons) { return { 'instance' : 'CDATA', slot1 : true, slot2 : Fay$$fayToJs_string(%1) }; } else { var monad = Fay$$_(%1, true); return monad.value; }})()"
+
+class AsAttr a                       -- where asAttr :: a -> Fay (String, String)
+instance AsAttr (Attr String String) -- where asAttr (a := b) = return (a, b)
+
+asAttr :: (Attr String String) -> Fay (String, String)
+asAttr ((:=) a b) = return (a, b)
 
 -- | ADT for 'HTML'
 data HTML
@@ -17,11 +39,11 @@ data HTML
     | CDATA Bool String                        -- ^ CDATA needEscaping value
 
 -- | generate an HTML element
-genElement :: String                  -- ^ Element name
+genElement :: (Maybe String, String)  -- ^ Element name
            -> [Fay (String, String)]  -- ^ list of attributes
            -> [Fay HTML]              -- ^ list of children
            -> Fay HTML
-genElement n genAttrs genChildren =
+genElement (_, n) genAttrs genChildren =
     do attrs    <- sequence $ genAttrs
        children <- sequence $ genChildren
        return (Element n attrs children)
@@ -44,10 +66,10 @@ renderHTML (CDATA True str) =
 renderHTML (CDATA False str) =
     do alert "Unsure how to insert pre-escaped text into the generated HTML."
        selectElement =<< createTextNode str
-    where
-      -- | Alert using window.alert.
-      alert :: String -> Fay ()
-      alert = ffi "window.alert(%1)"
+
+-- | Alert using window.alert.
+alert :: String -> Fay ()
+alert = ffi "window.alert(%1)"
 
 ------------------------------------------------------------------------------
 -- HTML Combinators
@@ -56,19 +78,19 @@ renderHTML (CDATA False str) =
 tr :: [Fay (String, String)] -- ^ attributes
    -> [Fay HTML]             -- ^ children
    -> Fay HTML
-tr = genElement "tr"
+tr ats chd = genElement (Nothing, "tr") ats chd
 
 -- | \<td\>
 td :: [Fay (String, String)]  -- ^ attributes
    -> [Fay HTML]              -- ^ children
    -> Fay HTML
-td = genElement "td"
+td = genElement (Nothing, "td")
 
 -- | \<span\>
-span :: [Fay (String, String)] -- ^ attributes
+span_ :: [Fay (String, String)] -- ^ attributes
      -> [Fay HTML]             -- ^ children
      -> Fay HTML
-span = genElement "span"
+span_ = genElement (Nothing, "span")
 
 -- | create a text node from the 'String'. The 'String' will be
 -- automatically escaped.
@@ -90,4 +112,3 @@ createElement = ffi "document.createElement(%1)"
 createTextNode :: String -- ^ text to insert in the node
                -> Fay Element
 createTextNode = ffi "document.createTextNode(%1)"
-

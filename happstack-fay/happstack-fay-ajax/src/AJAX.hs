@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, NoImplicitPrelude #-}
+{-# LANGUAGE DeriveDataTypeable, NoImplicitPrelude, PackageImports #-}
 {- |
 
 client-side half of a typed AJAX communication channel.
@@ -29,19 +29,14 @@ block until the 'call' returns a value, so we perform the AJAX request
 asynchronously. The third argument to 'call' is the callback function
 to run when the response is received.
 
-See also: "Happstack.Fay"
-
 -}
-module Language.Fay.AJAX where
+module AJAX where
 
-import Language.Fay.FFI
-import Language.Fay.Prelude
-
--- | 'ResponseType' is used in lieu of `GADTs` as a mechanism for
--- specifying the expected return type of remote AJAX calls.
-data ResponseType a = ResponseType
-    deriving (Eq, Read, Show, Data, Typeable)
-instance Foreign (ResponseType a)
+import "fay-base" Data.Data
+import FFI
+import JQuery
+import ResponseType
+import "fay-base" Prelude
 
 -- | Asynchronously call a command
 --
@@ -50,13 +45,11 @@ instance Foreign (ResponseType a)
 --
 -- This function is just a wrapper around 'ajaxCommand' which uses the
 -- 'ResponseType res' phantom-typed parameter for added type safety.
-call :: (Foreign cmd, Foreign res) =>
-        String                    -- ^ URL to 'POST' AJAX request to
+call :: String                    -- ^ URL to 'POST' AJAX request to
      -> (ResponseType res -> cmd) -- ^ AJAX command to send to server
      -> (res -> Fay ())           -- ^ callback function to handle response
      -> Fay ()
-call uri f g =
-    ajaxCommand uri (f ResponseType) g
+call uri f g = ajaxCommand uri (f ResponseType) g
 
 -- | Run the AJAX command. (internal)
 --
@@ -67,16 +60,6 @@ call uri f g =
 -- code, the callback function will never be run.
 --
 -- see also: 'call'
-ajaxCommand :: (Foreign cmd, Foreign res) =>
-               String
-            -> cmd
-            -> (res -> Fay ())
-            -> Fay ()
+ajaxCommand :: String -> Automatic cmd -> (Automatic res -> Fay ()) -> Fay ()
 ajaxCommand =
-    ffi "jQuery['ajax']({\
-        \ \"url\": %1, \
-        \ \"type\": 'POST', \
-        \ \"data\": { \"json\": JSON.stringify(%2) }, \
-        \ \"dataType\": 'json', \
-        \ \"success\" : %3 \
-        \})"
+    ffi "jQuery['ajax']({'url': %1, 'type': 'POST', 'data': { 'json' : JSON.stringify(%2) }, 'dataType': 'json', 'success' : %3 })"
