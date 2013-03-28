@@ -38,6 +38,8 @@ module Happstack.Auth.Core.Auth
     , RemoveAuthUserPassId(..)
     , UserPassIdAuthIds(..)
     , AskAuthState(..)
+    , SetDefaultSessionTimeout(..)
+    , GetDefaultSessionTimeout(..)
     , addAuthCookie
     , deleteAuthCookie
     , getAuthId
