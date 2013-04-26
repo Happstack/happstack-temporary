@@ -2,52 +2,61 @@
 --
 -- See the Heist Section of the Happstack Crash Course for detailed documentation:
 --
---  <http://happstack.com/docs/crashcourse/Templates.html#helloheist>
+--  <http://happstack.com/docs/crashcourse/>
 module Happstack.Server.Heist
-    ( templateReloader
-    , templateServe
-    , render
-    ) where
+    ( initHeistCompiled
+    , heistServe
+    )
+    where
 
 import Blaze.ByteString.Builder                (toLazyByteString)
 import Control.Monad                           (MonadPlus(mzero), msum, liftM)
 import Control.Monad.Trans                     (MonadIO(liftIO))
+import Control.Monad.Trans.Either              (EitherT(runEitherT))
+import Data.Monoid                             (mempty)
 import           Data.ByteString.Char8         (ByteString)
 import qualified Data.ByteString.Char8         as B
 import qualified Data.ByteString.Lazy          as L
-import Happstack.Server                        (Response, ServerMonad, askRq, nullDir, rqPaths, toResponseBS)
+import Data.Text                               (Text)
+import Happstack.Server                        (Happstack, Response, ServerMonad, askRq, nullDir, rqPaths, toResponseBS)
+import Happstack.Server.FileServe.BuildingBlocks (combineSafe)
+import Heist                                   (AttrSplice, HeistConfig(..), HeistState, MIMEType, defaultLoadTimeSplices, initHeist, loadTemplates)
+import Heist.Compiled                          (Splice, renderTemplate)
 import System.FilePath                         (joinPath)
-import Heist.Compiled                          (renderTemplate)
-import Heist.TemplateDirectory (TemplateDirectory, getDirectoryHS, reloadTemplateDirectory)
 
--- | serve the heist templates from the 'TemplateDirectory m'
-templateServe :: (ServerMonad m, MonadPlus m, MonadIO m) =>
-                 TemplateDirectory m
-              -> m Response
-templateServe td =
-    msum [ nullDir >> render td (B.pack "index")
+initHeistCompiled :: (MonadIO m, Monad n) =>
+                     [(Text, Splice n)]     -- ^ compiled splices
+                  -> [(Text, AttrSplice n)] -- ^ attribute splices
+                  -> FilePath               -- ^ path to template directory
+                  -> m (Either [String] (HeistState n))
+initHeistCompiled splices attrSplices templateDir =
+    liftIO $ runEitherT $
+           do templateRepo <- loadTemplates templateDir
+              initHeist $ mempty { hcLoadTimeSplices  = defaultLoadTimeSplices
+                                 , hcCompiledSplices  = splices
+                                 , hcAttributeSplices = attrSplices
+                                 , hcTemplates        = templateRepo
+                                 }
+
+heistServe :: (Happstack m) =>
+              HeistState m
+           -> m Response
+heistServe heistState =
+    msum [ nullDir >> renderHeistTemplate heistState (B.pack "index")
          , do rq <- askRq
-              let safepath = joinPath $ filter (\x->not (null x) && x /= ".." && x /= ".") (rqPaths rq)
-              render td (B.pack safepath)
+              case combineSafe "" (joinPath (rqPaths rq)) of
+                Nothing -> mzero
+                (Just safepath) ->
+                    renderHeistTemplate heistState (B.pack safepath)
          ]
 
--- | force a reload of the templates from disk
-templateReloader :: (MonadIO m, MonadIO n) =>
-                    TemplateDirectory m
-                 -> n Response
-templateReloader td = do
-    e <- liftIO $ reloadTemplateDirectory td
-    return $ toResponseBS (B.pack "text/plain; charset=utf-8") $
-        L.fromChunks [either B.pack (const $ B.pack "Templates loaded successfully.") e]
-
-
--- | render the specified template
-render:: (MonadPlus m, MonadIO m) =>
-         TemplateDirectory m  -- ^ 'TemplateDirectory' handle
-      -> ByteString           -- ^ template name
-      -> m Response
-render td template = do
-    ts    <- liftIO $ getDirectoryHS td
-    let t = renderTemplate ts template
-    flip (maybe mzero) t $ \(builder, mimeType) ->
-      liftM (toResponseBS mimeType . toLazyByteString) builder
+renderHeistTemplate :: (MonadPlus n) =>
+                       HeistState n
+                    -> ByteString
+                    -> n Response
+renderHeistTemplate heistState templateName =
+       case renderTemplate heistState templateName of
+         Nothing -> mzero
+         Just (builderM, mimeType) ->
+             do builder <- builderM
+                return $ toResponseBS mimeType (toLazyByteString builder)
