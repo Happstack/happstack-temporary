@@ -94,11 +94,10 @@ initHeistCompiled :: (MonadIO m, Monad n) =>
                   -> m (Either [String] (HeistState n))
 initHeistCompiled splices attrSplices templateDir =
     liftIO $ runEitherT $
-           do templateRepo <- loadTemplates templateDir
               initHeist $ mempty { hcLoadTimeSplices  = defaultLoadTimeSplices
                                  , hcCompiledSplices  = splices
                                  , hcAttributeSplices = attrSplices
-                                 , hcTemplates        = templateRepo
+                                 , hcTemplateLocations = [loadTemplates templateDir]
                                  }
 
 heistServe :: (Happstack m) =>
