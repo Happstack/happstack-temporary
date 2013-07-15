@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, QuasiQuotes, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, QuasiQuotes, TypeSynonymInstances, OverloadedStrings, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -- | This module provides support for:
 --
@@ -71,15 +71,17 @@
 -- using one method over the other you can use the @newtype@ wrappers
 -- 'XMLToInnerHTML' or 'XMLToDOM' to select which method to use.
 
-module HSX.JMacro where
+module HSP.JMacro where
 
+import Control.Monad.Identity
 import Control.Monad.Trans                 (lift)
 import Control.Monad.State                 (MonadState(get,put))
-import Data.Text.Lazy                      (Text)
-import qualified Happstack.Server.HSP.HTML as HTML
-import Happstack.Server.HSP.HTML           (XML(..), Attribute(..), AttrValue(..))
-import HSX.XMLGenerator                    (XMLGenerator(..), XMLGen(..), EmbedAsChild(..), EmbedAsAttr(..), IsName(..), Attr(..), Name)
-import qualified HSP.Identity              as HSP
+import Data.Text.Lazy                      (Text, unpack)
+import HSP.XML
+import HSP.HTML4                           (renderAsHTML)
+import HSP.XMLGenerator
+import HSP.Monad (HSPT(..))
+
 import Language.Javascript.JMacro          (JStat(..), JExpr(..), JVal(..), Ident(..), ToJExpr(..), toStat, jmacroE, jLam, jVarTy, jsToDoc, jsSaturate, renderPrefixJs)
 import Text.PrettyPrint.Leijen.Text        (Doc, displayT, renderOneLine)
 
@@ -100,34 +102,34 @@ nextInteger' =
        put (succ i)
        return i
 
-instance (XMLGenerator m, IntegerSupply m, EmbedAsChild m Text) => EmbedAsChild m JStat where
+instance (XMLGenerator m, IntegerSupply m, EmbedAsChild m Text, StringType m ~ Text) => EmbedAsChild m JStat where
   asChild jstat =
       do i <- lift nextInteger
-         asChild $ genElement (Nothing, "script")
-                    [asAttr ("type" := "text/javascript")]
+         asChild $ genElement (Nothing, fromStringLit "script")
+                    [asAttr ((fromStringLit "type" := fromStringLit "text/javascript") :: Attr Text Text)]
                     [asChild (displayT $ renderOneLine $ renderPrefixJs (show i) jstat)]
 
-instance (IntegerSupply m, IsName n, EmbedAsAttr m (Attr Name Text)) => EmbedAsAttr m (Attr n JStat) where
+instance (IntegerSupply m, EmbedAsAttr m (Attr n Text)) => EmbedAsAttr m (Attr n JStat) where
   asAttr (n := jstat) =
       do i <- lift nextInteger
-         asAttr $ (toName n := (displayT $ renderOneLine $ renderPrefixJs (show i) jstat))
+         asAttr $ (n := (displayT $ renderOneLine $ renderPrefixJs (show i) jstat))
 
 -- | Provided for convenience since @Ident@ is exported by both
 -- @HSP.Identity@ and @JMacro@.  Using this you can avoid the need for an
 -- extra and qualified import.
-type DOMNode = HSP.Ident HTML.XML
+type DOMNode = HSPT XML Identity XML
 
 instance ToJExpr DOMNode where
-  toJExpr = toJExpr . HSP.evalIdentity
+  toJExpr = toJExpr . runIdentity . unHSPT
 
 -- | newtype which can be used with 'toJExpr' to specify that the XML
 -- should be converted to a DOM in javascript by using 'innerHTML'
-newtype XMLToInnerHTML = XMLToInnerHTML HTML.XML
+newtype XMLToInnerHTML = XMLToInnerHTML XML
 
 instance ToJExpr XMLToInnerHTML where
   toJExpr (XMLToInnerHTML xml) =
       [jmacroE| (function { var node = document.createElement('div')
-                          ; node.innerHTML = `(HTML.renderAsHTML xml)`
+                          ; node.innerHTML = `(unpack $ renderAsHTML xml)`
                           ; return node.childNodes[0]
                           })() |]
 
@@ -136,11 +138,14 @@ instance ToJExpr XMLToInnerHTML where
 -- @createElement@, @appendChild@, and other DOM functions.
 --
 -- WARNING: @CDATA FALSE@ values are assumed to be pre-escaped HTML and will be converted to a DOM node by using @innerHTML@. Additionally, if the call to @innerHTML@ returns more than one node, only the first node is used.
-newtype XMLToDOM = XMLToDOM HTML.XML
+newtype XMLToDOM = XMLToDOM XML
 
 instance ToJExpr XMLToDOM where
-  toJExpr (XMLToDOM (Element (dm, n) attrs children)) =
-      [jmacroE| (function { var node = `(createElement dm n)`
+  toJExpr (XMLToDOM (Element (dm', n') attrs children)) =
+      let dm = fmap unpack dm'
+          n = unpack n'
+      in
+      [jmacroE| (function { var node = `(createElement (dm) (n))`
                           ;  `(map (setAttribute node) attrs)`
                           ;  `(map (appendChild node . XMLToDOM) children)`
                           ;  return node
@@ -160,19 +165,28 @@ instance ToJExpr XMLToDOM where
                         }
                        })()
              |]
-        setAttribute node (MkAttr ((Nothing, nm), (Value True val))) =
+        setAttribute node (MkAttr ((Nothing, nm'), (Value True val'))) =
+            let nm = unpack nm'
+                val = unpack val'
+            in
             [jmacroE| `(node)`.setAttribute(`(nm)`, `(val)`) |]
-        setAttribute node (MkAttr ((Just ns, nm), (Value True val))) =
+        setAttribute node (MkAttr ((Just ns', nm'), (Value True val'))) =
+            let ns = unpack ns'
+                nm = unpack nm'
+                val = unpack val'
+            in
             [jmacroE| `(node)`.setAttributeNS(`(ns)`, `(nm)`, `(val)`) |]
 
-  toJExpr (XMLToDOM (CDATA True txt)) =
+  toJExpr (XMLToDOM (CDATA True txt')) =
+      let txt = unpack txt' in
       [jmacroE| document.createTextNode(`(txt)`) |]
 
-  toJExpr (XMLToDOM (CDATA False txt)) =
+  toJExpr (XMLToDOM (CDATA False txt')) =
+      let txt = unpack txt' in
       [jmacroE| (function { var node = document.createElement('div')
                           ; node.innerHTML = `(txt)`
                           ; return node
                           })() |]
 
-instance ToJExpr HTML.XML where
+instance ToJExpr XML where
     toJExpr = toJExpr . XMLToInnerHTML

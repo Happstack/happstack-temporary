@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, TypeSynonymInstances, QuasiQuotes #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, TypeSynonymInstances, QuasiQuotes, OverloadedStrings #-}
 -- | This experimental module provides a monad transformer 'JMacroT'
 -- and corresponding 'XMLGenerator' instance which can be used to
 -- directly generate javascript which builds an XML/HTML DOM.
@@ -9,7 +9,7 @@
 --
 -- This is intellectually fun. But it is not clear how it is valuable.
 -- That is why this module is marked as experimental.
-module HSX.JMacroT
+module HSP.JMacroT
     ( JMacroT(..)
     , evalJMacroT
     , mapJMacroT
@@ -29,7 +29,7 @@ import Control.Monad.RWS          (MonadRWS)
 import Control.Monad.Trans        (MonadIO, MonadTrans(..))
 import qualified Data.Text        as Strict
 import qualified Data.Text.Lazy   as Lazy
-import HSX.XMLGenerator           (Attr(..), XMLGen(..), XMLGenT(..), XMLGenerator, AppendChild(..), EmbedAsAttr(..), EmbedAsChild(..), Name(..), SetAttr(..), unXMLGenT)
+import HSP.XMLGenerator           (Attr(..), XMLGen(..), XMLGenT(..), XMLGenerator, AppendChild(..), EmbedAsAttr(..), EmbedAsChild(..), Name(..), SetAttr(..), unXMLGenT)
 
 import Language.Javascript.JMacro (ToJExpr(..), JExpr(..), JStat(..), JVal(JVar), Ident(StrI), ToStat(..), jmacroE, jLam, jVarTy)
 
@@ -60,16 +60,17 @@ instance (ToJExpr a) => ToJExpr (XMLGenT JMacroM a) where
 
 instance (Functor m, Monad m) => XMLGen (JMacroT m) where
     type XMLType          (JMacroT m) = JExpr
+    type StringType (JMacroT m) = Lazy.Text
     newtype ChildType     (JMacroT m) = JMChild { unJMChild :: JExpr }
     newtype AttributeType (JMacroT m) = JMAttr  { unJMAttr  :: JExpr }
     genElement        = element
     xmlToChild        = JMChild
-    pcdataToChild str = JMChild $ [jmacroE| document.createTextNode(`(str)`) |]
+    pcdataToChild str = JMChild $ [jmacroE| document.createTextNode(`(Lazy.unpack str)`) |]
 
 
 -- | generate an XML Element
 element :: (Functor m, Monad m, EmbedAsAttr (JMacroT m) attr, EmbedAsChild (JMacroT m) child) =>
-           Name    -- ^ element name
+           Name Lazy.Text    -- ^ element name
         -> [attr]  -- ^ attributes
         -> [child] -- ^ children
         -> XMLGenT (JMacroT m) JExpr
@@ -77,7 +78,7 @@ element (ns, nm) attrs childer =
     do ats      <- fmap (map unJMAttr  . concat) $ mapM asAttr  attrs
        children <- fmap (map unJMChild . concat) $ mapM asChild childer
        return
-        [jmacroE| (function { var node = `(createElement ns nm)`;
+        [jmacroE| (function { var node = `(createElement (fmap Lazy.unpack ns) (Lazy.unpack nm))`;
                               `(map (setAttributeNode node) ats)`;
                               `(map (appendChild node) children)`;
                               return node;
@@ -98,19 +99,19 @@ setAttributeNode :: JExpr -> JExpr -> JExpr
 setAttributeNode node attr =
     [jmacroE| `(node)`.setAttributeNode(`(attr)`) |]
 
-instance (Functor m, Monad m) => EmbedAsAttr (JMacroT m) (Attr String String) where
+instance (Functor m, Monad m) => EmbedAsAttr (JMacroT m) (Attr Lazy.Text Lazy.Text) where
     asAttr (n := v) =
-        return [JMAttr [jmacroE| (function (){ var attrNode = document.createAttribute(`(n)`)
-                                             ; attrNode.nodeValue = `(v)`
+        return [JMAttr [jmacroE| (function (){ var attrNode = document.createAttribute(`(Lazy.unpack n)`)
+                                             ; attrNode.nodeValue = `(Lazy.unpack v)`
                                              ; return attrNode;
                                              })()
                        |]]
 
-instance (Functor m, Monad m) => EmbedAsChild (JMacroT m) Char where
-    asChild c = return [pcdataToChild [c]]
+instance (Functor m, Monad m, StringType (JMacroT m) ~ Lazy.Text) => EmbedAsChild (JMacroT m) Char where
+    asChild c = return [pcdataToChild $ Lazy.singleton c]
 
-instance (Functor m, Monad m) => EmbedAsChild (JMacroT m) String where
-    asChild str = return [pcdataToChild str]
+instance (Functor m, Monad m, StringType (JMacroT m) ~ Lazy.Text) => EmbedAsChild (JMacroT m) String where
+    asChild str = return [pcdataToChild $ Lazy.pack str]
 
 instance (Functor m, Monad m) => EmbedAsChild (JMacroT m) Strict.Text where
     asChild txt = return [JMChild $ [jmacroE| document.createTextNode(`(Strict.unpack txt)`) |]]
@@ -121,12 +122,12 @@ instance (Functor m, Monad m) => EmbedAsChild (JMacroT m) Lazy.Text where
 instance (Functor m, Monad m) => EmbedAsChild (JMacroT m) () where
     asChild () = return []
 
-instance (Functor m, Monad m) => EmbedAsAttr (JMacroT m) (Attr String Bool) where
-    asAttr (n := True)  = asAttr (n := "true")
-    asAttr (n := False) = asAttr (n := "false")
+instance (Functor m, Monad m) => EmbedAsAttr (JMacroT m) (Attr Lazy.Text Bool) where
+    asAttr (n := True)  = asAttr (n := ("true" :: Lazy.Text))
+    asAttr (n := False) = asAttr (n := ("false" :: Lazy.Text))
 
-instance (Functor m, Monad m) => EmbedAsAttr (JMacroT m) (Attr String Int) where
-    asAttr (n := v) = asAttr (n := show v)
+instance (Functor m, Monad m) => EmbedAsAttr (JMacroT m) (Attr Lazy.Text Int) where
+    asAttr (n := v) = asAttr (n := (Lazy.pack $ show v))
 
 instance (Functor m, Monad m) => AppendChild (JMacroT m) JExpr where
     appChild parent child =
@@ -144,4 +145,4 @@ instance (Functor m, Monad m) => SetAttr (JMacroT m) JExpr where
         do as <- attrNodes
            return $ [jmacroE| `(map (setAttributeNode elem) (map unJMAttr as))` |]
 
-instance (Functor m, Monad m) => XMLGenerator (JMacroT m)
+instance (Functor m, Monad m, StringType (JMacroT m) ~ Lazy.Text) => XMLGenerator (JMacroT m)
