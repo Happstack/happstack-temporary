@@ -10,7 +10,8 @@ import Prelude
 import JQuery
 import FFI
 
-type Text = String
+fromStringLit :: String -> String
+fromStringLit = id
 
 data Attr a b = a := b
 
