@@ -12,6 +12,7 @@ module Happstack.Auth.Blaze.Templates
       handleAuth
     , handleProfile
     , handleAuthProfile
+    , handleAuthProfileRouteT
     , authProfileHandler
       -- * page functions
     , addAuthPage
