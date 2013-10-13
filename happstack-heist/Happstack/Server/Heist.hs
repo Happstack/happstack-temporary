@@ -69,7 +69,7 @@
 --
 module Happstack.Server.Heist
     ( initHeistCompiled
-   , heistServe
+    , heistServe
     )
     where
 
