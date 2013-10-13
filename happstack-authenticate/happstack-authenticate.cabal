@@ -1,5 +1,5 @@
 Name:                happstack-authenticate
-Version:             0.10.6
+Version:             0.10.7
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
 Homepage:            http://www.happstack.com/
@@ -31,7 +31,7 @@ Library
                        Happstack.Auth.Core.AuthProfileURL
 
   Build-depends:       base                         > 4 && < 5,
-                       acid-state                   >= 0.6,
+                       acid-state                   >= 0.6 && <= 0.13,
                        aeson                        >= 0.4 && < 0.7,
                        authenticate                 == 1.3.*,
                        blaze-html                   >= 0.5 && < 0.7,
