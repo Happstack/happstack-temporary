@@ -17,7 +17,7 @@
 -- > import qualified Data.Text    as T
 -- > import Happstack.Server       (dir, nullConf, nullDir, simpleHTTP, seeOther, toResponse)
 -- > import Happstack.Server.Heist (heistServe, initHeistCompiled)
--- > import Heist                  (getParamNode)
+-- > import Heist                  ((##), getParamNode, noSplices)
 -- > import Heist.Compiled         (Splice, yieldRuntimeText)
 -- > import qualified Text.XmlHtml as X
 -- >
@@ -36,7 +36,7 @@
 -- > main :: IO ()
 -- > main =
 -- >   do heistState <- do
--- >        r <- initHeistCompiled [(T.pack "fact", factSplice)] [] "."
+-- >        r <- initHeistCompiled (T.pack "fact" ## factSplice) noSplices "."
 -- >        case r of
 -- >          (Left e) -> error $ unlines e
 -- >          (Right heistState) -> return $ heistState
@@ -83,13 +83,13 @@ import qualified Data.ByteString.Char8         as B
 import Data.Text                               (Text)
 import Happstack.Server                        (Happstack, Response, ServerMonad, askRq, nullDir, rqPaths, toResponseBS)
 import Happstack.Server.FileServe.BuildingBlocks (combineSafe)
-import Heist                                   (AttrSplice, HeistConfig(..), HeistState, defaultLoadTimeSplices, initHeist, loadTemplates)
+import Heist                                   (AttrSplice, HeistConfig(..), HeistState, Splices, defaultLoadTimeSplices, initHeist, loadTemplates)
 import Heist.Compiled                          (Splice, renderTemplate)
 import System.FilePath                         (joinPath)
 
 initHeistCompiled :: (MonadIO m, Monad n) =>
-                     [(Text, Splice n)]     -- ^ compiled splices
-                  -> [(Text, AttrSplice n)] -- ^ attribute splices
+                     Splices (Splice n)     -- ^ compiled splices
+                  -> Splices (AttrSplice n) -- ^ attribute splices
                   -> FilePath               -- ^ path to template directory
                   -> m (Either [String] (HeistState n))
 initHeistCompiled splices attrSplices templateDir =
