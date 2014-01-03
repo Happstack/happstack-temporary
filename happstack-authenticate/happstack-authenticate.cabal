@@ -1,5 +1,5 @@
 Name:                happstack-authenticate
-Version:             0.10.7
+Version:             0.10.8
 Synopsis:            Happstack Authentication Library
 Description:         A themeable authentication library with support for username+password and OpenId.
 Homepage:            http://www.happstack.com/
@@ -39,14 +39,14 @@ Library
                        containers                   >= 0.4 && < 0.6,
                        ixset                        >= 1.0 && < 1.1,
                        happstack-server             >= 6.0 && < 7.4,
-                       http-conduit                 >= 1.4 && < 1.10,
+                       http-conduit                 >= 1.4 && < 2.1,
                        http-types                   >= 0.6 && < 0.9,
                        fb                           >= 0.13 && < 0.15,
                        safecopy                     >= 0.6,
                        mtl                          >= 2.0,
                        pwstore-purehaskell          == 2.1.*,
                        QuickCheck                   >= 2,
-                       text                         == 0.11.*,
+                       text                         >= 0.11 && < 1.1,
                        time                         >= 1.2 && < 1.5,
                        reform                       == 0.2.*,
                        reform-blaze                 == 0.2.*,
