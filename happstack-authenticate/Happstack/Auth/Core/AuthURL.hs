@@ -63,6 +63,7 @@ data AuthURL
     = A_Login
     | A_AddAuth
     | A_Logout
+    | A_Signup
     | A_Local
     | A_CreateAccount
     | A_ChangePassword
@@ -84,9 +85,10 @@ instance Arbitrary OpenIdURL where
 
 instance Arbitrary AuthURL where
     arbitrary = oneof [ return A_Login
-                      , return A_Logout
-                      , return A_Local
                       , return A_AddAuth
+                      , return A_Logout
+                      , return A_Signup
+                      , return A_Local
                       , return A_CreateAccount
                       , return A_ChangePassword
                       , A_OpenId <$> arbitrary
@@ -115,6 +117,7 @@ instance PathInfo AuthURL where
     toPathSegments A_CreateAccount  = ["create"]
     toPathSegments A_ChangePassword = ["change_password"]
     toPathSegments A_AddAuth        = ["add_auth"]
+    toPathSegments A_Signup         = ["signup"]
     toPathSegments (A_OpenId o)     = "openid" : toPathSegments o
     toPathSegments (A_OpenIdProvider authMode provider) = "provider" : toPathSegments authMode ++ toPathSegments provider
     toPathSegments (A_Facebook authMode)         = "facebook"          : toPathSegments authMode
@@ -127,6 +130,8 @@ instance PathInfo AuthURL where
                   return A_Logout
              , do segment "local"
                   return A_Local
+             , do segment "signup"
+                  return A_Signup
              , do segment "create"
                   return A_CreateAccount
              , do segment "change_password"

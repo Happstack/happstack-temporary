@@ -108,7 +108,8 @@ loginPage mFacebook =
        genericURL     <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Generic)
        localURL       <- H.toValue <$> showURL A_Local
        facebookURL    <- H.toValue <$> showURL (A_Facebook LoginMode)
-       return $ H.div ! A.id "happstack-authenticate" $
+       signupURL      <- H.toValue <$> showURL A_Signup
+       return $ H.div ! A.id "happstack-authenticate" $ do
                   H.ol $ do
                     H.li $ (a ! href googleURL      $ "Login") >> " with your Google account"
                     H.li $ (a ! href yahooURL       $ "Login") >> " with your Yahoo account"
@@ -119,6 +120,29 @@ loginPage mFacebook =
                     case mFacebook of
                       (Just _) -> H.li $ (a ! href facebookURL $ "Login") >> " with your Facebook account"
                       Nothing -> return ()
+                  H.p $ (a ! href signupURL $ "Create a New Account.")
+
+signupPage :: (MonadRoute m, URL m ~ AuthURL, Happstack m) => Maybe Credentials -> m Html
+signupPage mFacebook =
+    do googleURL      <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Google)
+       yahooURL       <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Yahoo)
+       liveJournalURL <- H.toValue <$> showURL (A_OpenIdProvider LoginMode LiveJournal)
+       myspaceURL     <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Myspace)
+       genericURL     <- H.toValue <$> showURL (A_OpenIdProvider LoginMode Generic)
+       localURL       <- H.toValue <$> showURL A_CreateAccount
+       facebookURL    <- H.toValue <$> showURL (A_Facebook LoginMode)
+       return $ H.div ! A.id "happstack-authenticate" $
+                  H.ol $ do
+                    H.li $ (a ! href googleURL      $ "Signup") >> " with your Google account"
+                    H.li $ (a ! href yahooURL       $ "Signup") >> " with your Yahoo account"
+                    H.li $ (a ! href liveJournalURL $ "Signup") >> " with your Live Journal account"
+                    H.li $ (a ! href myspaceURL     $ "Signup") >> " with your Myspace account"
+                    H.li $ (a ! href genericURL     $ "Signup") >> " with your OpenId account"
+                    H.li $ (a ! href localURL       $ "Signup") >> " with a username and password"
+                    case mFacebook of
+                      (Just _) -> H.li $ (a ! href facebookURL $ "Signup") >> " with your Facebook account"
+                      Nothing -> return ()
+
 
 addAuthPage :: (MonadRoute m, URL m ~ AuthURL, Happstack m) => Maybe Credentials -> m Html
 addAuthPage mFacebook =
@@ -289,7 +313,7 @@ handleAuth authStateH appTemplate mFacebook realm onAuthURL url =
       A_Login           -> appTemplate "Login"    mempty =<< loginPage mFacebook
       A_AddAuth         -> appTemplate "Add Auth" mempty =<< addAuthPage mFacebook
       A_Logout          -> appTemplate "Logout"   mempty =<< logoutPage authStateH
-
+      A_Signup          -> appTemplate "Signup"   mempty =<< signupPage mFacebook
       A_Local           -> localLoginPage authStateH appTemplate url onAuthURL
       A_CreateAccount   -> createAccountPage authStateH appTemplate onAuthURL url
       A_ChangePassword  -> changePasswordPage authStateH appTemplate url
