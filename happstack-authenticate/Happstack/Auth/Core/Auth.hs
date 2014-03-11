@@ -132,7 +132,12 @@ $(deriveSafeCopy 1 'base ''Identifier)
 -- * AuthMap
 
 newtype FacebookId_001 = FacebookId_001 { unFacebookId_001 :: Text }
-    deriving (Eq, Ord, Read, Show, Data, Typeable, SafeCopy)
+     deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+instance SafeCopy FacebookId_001 where
+  kind = base
+  putCopy (FacebookId_001 txt) = contain $ safePut txt
+  getCopy = contain $ FacebookId_001 <$> safeGet
 
 newtype FacebookId_002 = FacebookId_002 { unFacebookId_002 :: B.ByteString }
     deriving (Eq, Ord, Read, Show, Data, Typeable)
