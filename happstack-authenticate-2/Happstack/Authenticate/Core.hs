@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveDataTypeable, DeriveGeneric, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, StandaloneDeriving, TemplateHaskell, TypeFamilies, TypeSynonymInstances, UndecidableInstances, OverloadedStrings #-}
+{-# LANGUAGE DataKinds, DeriveDataTypeable, DeriveGeneric, FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RecordWildCards, ScopedTypeVariables, StandaloneDeriving, TemplateHaskell, TypeOperators, TypeFamilies, TypeSynonymInstances, UndecidableInstances, OverloadedStrings #-}
 {-
 
 A user is uniquely identified by their 'UserId'. A user can have one
@@ -14,35 +14,71 @@ same account.
 
 An email address is also collected to make account recovery easier.
 
+Authentication Method
+---------------------
+
+When creating an account there are some common aspects -- such as the
+username and email address. But we also want to allow the user to
+select a method for authentication.
+
+Creating the account could be multiple steps. What if we store the
+partial data in a token. That way we avoid creating half-a-user.
+
+From an API point of view -- we want the client to simple POST to
+/users and create an account.
+
+For different authentication backends, we need the user to be able to
+fetch the partials for the extra information.
+
 -}
 
 module Happstack.Authenticate.Core where
 
-import Control.Applicative (Applicative(pure), Alternative, (<$>), optional)
-import Control.Lens        (makeLenses, view)
-import Control.Lens.At     (IxValue(..), Ixed(..), Index(..), At(at))
-import Control.Monad.Trans (MonadIO(liftIO))
-import Control.Monad.Reader (ask)
-import Control.Monad.State (get, put, modify)
-import Crypto.PasswordStore          (genSaltIO, exportSalt, makePassword, verifyPassword)
-import Data.Aeson                    (FromJSON, ToJSON)
-import Data.Acid (AcidState, Update, Query, makeAcidic)
-import Data.Acid.Advanced (update', query')
-import Data.Data (Data, Typeable)
-import Data.Maybe (maybeToList)
-import Data.Monoid ((<>))
-import Data.SafeCopy (SafeCopy, base, deriveSafeCopy)
+import Control.Applicative             (Applicative(pure), Alternative, (<$>), optional)
+import Control.Category                ((.), id)
+import Control.Exception               (SomeException)
+import qualified Control.Exception     as E
+import Control.Lens                    ((?=), (^.), (.~), makeLenses, view, set)
+import Control.Lens.At                 (IxValue(..), Ixed(..), Index(..), At(at))
+import Control.Monad.Trans             (MonadIO(liftIO))
+import Control.Monad.Reader            (ask)
+import Control.Monad.State             (get, put, modify)
+import Data.Aeson                      (FromJSON(..), ToJSON(..), Result(..), fromJSON)
+import qualified Data.Aeson            as A
+import Data.Aeson.Types                (Options(fieldLabelModifier), defaultOptions, genericToJSON, genericParseJSON)
+import Data.Acid                       (AcidState, Update, Query, makeAcidic)
+import Data.Acid.Advanced              (update', query')
+import Data.Acid.Local                 (createCheckpointAndClose, openLocalStateFrom)
+import Data.ByteString.Base64          (encode)
+import qualified Data.ByteString.Char8 as B
+import Data.Data                       (Data, Typeable)
+import Data.Default                    (def)
+import Data.Map                        (Map)
+import qualified Data.Map              as Map
+import Data.Maybe                      (fromMaybe, maybeToList)
+import Data.Monoid                     ((<>))
+import Data.SafeCopy                   (SafeCopy, base, deriveSafeCopy)
 import Data.IxSet.Typed
-import qualified Data.IxSet.Typed as IxSet
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import Data.Text     (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Data.Time     (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
-import Happstack.Server (Cookie(secure), CookieLife(Session), Happstack, Request(rqSecure), addCookie, askRq, expireCookie, lookCookieValue, mkCookie)
-import GHC.Generics  (Generic)
-import Web.Routes    (PathInfo(..))
+import qualified Data.IxSet.Typed      as IxSet
+import           Data.Set              (Set)
+import qualified Data.Set              as Set
+import Data.Text                       (Text)
+import qualified Data.Text             as Text
+import qualified Data.Text.Encoding    as Text
+import Data.Time                       (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
+import GHC.Generics                    (Generic)
+import Happstack.Server                (Cookie(secure), CookieLife(Session), Happstack, ServerPartT, Request(rqSecure), Response, addCookie, askRq, expireCookie, lookCookie, lookCookieValue, mkCookie, notFound, toResponseBS)
+import Language.Javascript.JMacro
+import Prelude                         hiding ((.), id)
+import System.FilePath                 (combine)
+import System.IO                       (IOMode(ReadMode), withFile)
+import System.Random                   (randomRIO)
+import Text.Boomerang.TH               (makeBoomerangs)
+import Web.JWT                         (Algorithm(HS256), JWT, VerifiedJWT, JWTClaimsSet(..), encodeSigned, claims, decode, decodeAndVerifySignature, secret, verify)
+import Web.Routes                      (RouteT, PathInfo(..), nestURL)
+import Web.Routes.Boomerang
+import Web.Routes.TH                   (derivePathInfo)
+
 {-
 -- | an 'AuthId' uniquely identifies an authentication.
 newtype AuthId = AuthId { unAuthId :: Integer }
@@ -58,19 +94,31 @@ succAuthId (AuthId i) = AuthId (succ i)
 
 -}
 
+-- | when creating JSON field names, drop the first character. Since
+-- we are using lens, the leading character should always be _.
+jsonOptions :: Options
+jsonOptions = defaultOptions { fieldLabelModifier = drop 1 }
+
+-- | convert a value to a JSON encoded 'Response'
+toJSONResponse :: (ToJSON a) => a -> Response
+toJSONResponse a = toResponseBS "application/json" (A.encode a)
+------------------------------------------------------------------------------
+
 ------------------------------------------------------------------------------
 -- UserId
 ------------------------------------------------------------------------------
 
 -- | a 'UserId' uniquely identifies a user.
 newtype UserId = UserId { _unUserId :: Integer }
-    deriving (Eq, Ord, Read, Show, Data, Typeable, Generic)
+    deriving (Eq, Ord, Enum, Read, Show, Data, Typeable, Generic)
 
 deriveSafeCopy 1 'base ''UserId
 makeLenses ''UserId
+makeBoomerangs ''UserId
 
-instance FromJSON UserId
-instance ToJSON UserId
+instance ToJSON   UserId where toJSON (UserId i) = toJSON i
+instance FromJSON UserId where parseJSON v = UserId <$> parseJSON v
+
 instance PathInfo UserId where
     toPathSegments (UserId i) = toPathSegments i
     fromPathSegments = UserId <$> fromPathSegments
@@ -88,8 +136,9 @@ newtype Username = Username { _unUsername :: Text }
 deriveSafeCopy 1 'base ''Username
 makeLenses ''Username
 
-instance FromJSON Username
-instance ToJSON Username
+instance ToJSON   Username where toJSON (Username i) = toJSON i
+instance FromJSON Username where parseJSON v = Username <$> parseJSON v
+
 instance PathInfo Username where
     toPathSegments (Username t) = toPathSegments t
     fromPathSegments = Username <$> fromPathSegments
@@ -103,8 +152,9 @@ newtype Email = Email { _unEmail :: Text }
 deriveSafeCopy 1 'base ''Email
 makeLenses ''Email
 
-instance FromJSON Email
-instance ToJSON Email
+instance ToJSON   Email where toJSON (Email i) = toJSON i
+instance FromJSON Email where parseJSON v = Email <$> parseJSON v
+
 instance PathInfo Email where
     toPathSegments (Email t) = toPathSegments t
     fromPathSegments = Email <$> fromPathSegments
@@ -123,8 +173,8 @@ data User = User
 deriveSafeCopy 1 'base ''User
 makeLenses ''User
 
-instance FromJSON User
-instance ToJSON User
+instance ToJSON   User where toJSON    = genericToJSON    jsonOptions
+instance FromJSON User where parseJSON = genericParseJSON jsonOptions
 
 type UserIxs = '[UserId, Username, Email]
 type IxUser  = IxSet UserIxs User
@@ -135,72 +185,49 @@ instance Indexable UserIxs User where
              (ixFun $ (:[]) . view username)
              (ixFun $ maybeToList . view email)
 
-{-
-type instance IxValue (IxSet ixs a) = a
-instance (Indexable ixs a, IsIndexOf (Index (IxSet ixs a)) ixs) => Ixed (IxSet ixs a) where
-    ix k f s =
-        case getOne $ s @= k of
-          Nothing -> pure s
-          (Just v) -> f v <&>  \v' -> IxSet.insert k v' s
--- instance At (IxSet ixs a)
--}
-
 ------------------------------------------------------------------------------
--- AuthToken
+-- SharedSecret
 ------------------------------------------------------------------------------
 
-
-newtype AuthSecret = AuthSecret { _unAuthSecret :: Text }
+newtype SharedSecret = SharedSecret { _unSharedSecret :: Text }
       deriving (Eq, Ord, Read, Show, Data, Typeable, Generic)
-deriveSafeCopy 1 'base ''AuthSecret
-makeLenses ''AuthSecret
+deriveSafeCopy 1 'base ''SharedSecret
+makeLenses ''SharedSecret
 
-instance FromJSON AuthSecret
-instance ToJSON AuthSecret
+-- | Generate a 'Salt' from 128 bits of data from @\/dev\/urandom@, with the
+-- system RNG as a fallback. This is the function used to generate salts by
+-- 'makePassword'.
+genSharedSecret :: (MonadIO m) => m SharedSecret
+genSharedSecret = liftIO $ E.catch genSharedSecretDevURandom (\(_::SomeException) -> genSharedSecretSysRandom)
 
-data AuthToken = AuthToken
-    { _tokenValue      :: AuthSecret         -- ^ secret text
-    , _tokenExpires    :: UTCTime      -- ^ time this token will expire
-    , _tokenLifetime   :: Int          -- ^ lifetime of token in seconds
-    , _tokenUserId     :: UserId
---    , tokenAuthId     :: Maybe AuthId
---    , tokenAuthMethod :: AuthMethod
-    }
-      deriving (Eq, Ord, Show, Data, Typeable, Generic)
-deriveSafeCopy 1 'base ''AuthToken
-makeLenses ''AuthToken
+-- | Generate a 'SharedSecret' from @\/dev\/urandom@.
+genSharedSecretDevURandom :: IO SharedSecret
+genSharedSecretDevURandom = withFile "/dev/urandom" ReadMode $ \h -> do
+                      secret <- B.hGet h 32
+                      return $ SharedSecret . Text.decodeUtf8 . encode $ secret
 
-instance FromJSON AuthToken
-instance ToJSON AuthToken
+-- | Generate a 'SharedSecret' from 'System.Random'.
+genSharedSecretSysRandom :: IO SharedSecret
+genSharedSecretSysRandom = randomChars >>= return . SharedSecret . Text.decodeUtf8 . encode . B.pack
+    where randomChars = sequence $ replicate 32 $ randomRIO ('\NUL', '\255')
 
-type AuthTokenIxs = '[AuthSecret, UserId]
-type IxAuthToken  = IxSet AuthTokenIxs AuthToken
+------------------------------------------------------------------------------
+-- SharedSecrets
+------------------------------------------------------------------------------
 
-instance Indexable AuthTokenIxs AuthToken where
-    empty = mkEmpty (ixFun $ (:[]) . view tokenValue)
-                    (ixFun $ (:[]) . view tokenUserId)
+type SharedSecrets = Map UserId SharedSecret
 
--- | generate an new authentication token
-genAuthToken :: (MonadIO m) => UserId -> Int -> m AuthToken
-genAuthToken userId lifetime = liftIO $
-    do -- the docs promise that the salt will be base64, so 'Text.decodeUtf8' should be safe
-       random <- Text.decodeUtf8 . exportSalt <$> genSaltIO
-       now    <- getCurrentTime
-       let expires = addUTCTime (fromIntegral lifetime) now
-           prefix  = Text.pack (show (_unUserId userId))
-       return $ AuthToken { _tokenValue    = AuthSecret $ prefix <> random
-                          , _tokenExpires  = expires
-                          , _tokenLifetime = lifetime
-                          , _tokenUserId   = userId
-                          }
+initialSharedSecrets :: SharedSecrets
+initialSharedSecrets = Map.empty
 
 ------------------------------------------------------------------------------
 -- AuthenticateState
 ------------------------------------------------------------------------------
 
 data AuthenticateState = AuthenticateState
-    { _authTokens            :: IxAuthToken
+    { _sharedSecrets         :: SharedSecrets
     , _users                 :: IxUser
+    , _nextUserId            :: UserId
     , _defaultSessionTimeout :: Int -- ^ default session time out in seconds
     }
     deriving (Eq, Show, Typeable, Generic)
@@ -210,50 +237,31 @@ makeLenses ''AuthenticateState
 -- | a reasonable initial 'AuthenticateState'
 initialAuthenticateState :: AuthenticateState
 initialAuthenticateState = AuthenticateState
-    { _authTokens             = IxSet.empty
-    , _users                  = IxSet.empty
+    { _sharedSecrets          = initialSharedSecrets
+    , _users                  = IxSet.fromList [(User (UserId 0) (Username "stepcut") (Just $ Email "jeremy@n-heptane.com"))]
+    , _nextUserId             = UserId 1
     , _defaultSessionTimeout  = 60*60
     }
 
 ------------------------------------------------------------------------------
--- AuthToken related AcidState functions
+-- SharedSecrets AcidState Methods
 ------------------------------------------------------------------------------
 
-addAuthToken :: AuthToken -> Update AuthenticateState ()
-addAuthToken authToken =
-    do as@AuthenticateState{..} <- get
-       put (as { _authTokens = IxSet.insert authToken _authTokens })
-
--- | look up the 'AuthToken' associated with the 'AuthSecret'
-askAuthToken :: AuthSecret  -- ^ token (used in the cookie, etc)
-             -> Query AuthenticateState (Maybe AuthToken)
-askAuthToken secret =
-    do as@AuthenticateState{..} <- ask
-       return $ getOne $ _authTokens @= secret
-
--- | update the 'AuthToken'
-updateAuthToken :: AuthToken -> Update AuthenticateState ()
-updateAuthToken authToken =
-    do as@AuthenticateState{..} <- get
-       put (as { _authTokens = IxSet.updateIx (view tokenValue authToken) authToken _authTokens })
-
--- | delete the 'AuthToken' associated with the 'AuthSecret'
-deleteAuthToken :: AuthSecret
+-- | set the 'SharedSecret' for 'UserId' overwritten any previous secret.
+setSharedSecret :: UserId
+                -> SharedSecret
                 -> Update AuthenticateState ()
-deleteAuthToken token =
-    do as@AuthenticateState{..} <- get
-       put (as { _authTokens = IxSet.deleteIx token _authTokens })
+setSharedSecret userId sharedSecret =
+  sharedSecrets . at userId ?= sharedSecret
 
--- | purge any 'AuthToken' from the database that is past its expiration date
-purgeExpiredTokens :: UTCTime
-                   -> Update AuthenticateState ()
-purgeExpiredTokens now =
-    do as@AuthenticateState{..} <- get
-       let authTokens' = IxSet.fromList $ filter (\at -> (view tokenExpires at) > now) (IxSet.toList _authTokens)
-       put as { _authTokens = authTokens'}
+-- | get the 'SharedSecret' for 'UserI'd
+getSharedSecret :: UserId
+                -> Query AuthenticateState (Maybe SharedSecret)
+getSharedSecret userId =
+  view (sharedSecrets . at userId)
 
 ------------------------------------------------------------------------------
--- SessionTimeout related AcidState functions
+-- SessionTimeout AcidState Methods
 ------------------------------------------------------------------------------
 
 -- | set the default inactivity timeout for new sessions
@@ -268,8 +276,39 @@ getDefaultSessionTimeout =
     view defaultSessionTimeout <$> ask
 
 ------------------------------------------------------------------------------
--- User related AcidState functions
+-- User related AcidState Methods
 ------------------------------------------------------------------------------
+
+-- | Create a new 'User'. This will allocate a new 'UserId'. The
+-- returned 'User' value will have the updated 'UserId'.
+createUser :: User
+           -> Update AuthenticateState User
+createUser u =
+  do as@AuthenticateState{..} <- get
+     let user' = set userId _nextUserId u
+         as' = as { _users      = IxSet.insert user' _users
+                  , _nextUserId = succ _nextUserId
+                  }
+     put as'
+     return user'
+
+-- | Update an existing 'User'. Must already have a valid 'UserId'.
+updateUser :: User
+           -> Update AuthenticateState ()
+updateUser u =
+  do as@AuthenticateState{..} <- get
+     let as' = as { _users = IxSet.updateIx (u ^. userId) u _users
+                  }
+     put as'
+
+-- | Delete 'User' with the specified 'UserId'
+deleteUser :: UserId
+           -> Update AuthenticateState ()
+deleteUser uid =
+  do as@AuthenticateState{..} <- get
+     let as' = as { _users = IxSet.deleteIx uid _users
+                  }
+     put as'
 
 -- | look up a 'User' by their 'Username'
 getUserByUsername :: Username
@@ -293,79 +332,188 @@ getUserByEmail email =
        return $ getOne $ us @= email
 
 makeAcidic ''AuthenticateState
-    [ 'addAuthToken
-    , 'askAuthToken
-    , 'updateAuthToken
-    , 'deleteAuthToken
-    , 'purgeExpiredTokens
-    , 'setDefaultSessionTimeout
+    [ 'setDefaultSessionTimeout
     , 'getDefaultSessionTimeout
+    , 'setSharedSecret
+    , 'getSharedSecret
+    , 'createUser
+    , 'updateUser
+    , 'deleteUser
     , 'getUserByUsername
     , 'getUserByUserId
     , 'getUserByEmail
     ]
 
 ------------------------------------------------------------------------------
--- Functions
+-- Token Functions
 ------------------------------------------------------------------------------
 
--- | add an authentication token for 'UserId'
-addAuthCookie :: (Happstack m) =>
-                 AcidState AuthenticateState
-              -> UserId
-              -> m ()
-addAuthCookie acidH userId =
-    do lifetime  <- query' acidH GetDefaultSessionTimeout
-       authToken <- genAuthToken userId lifetime
-       now <- liftIO $ getCurrentTime
-       update' acidH (PurgeExpiredTokens now)
-       update' acidH (AddAuthToken authToken)
-       s <- rqSecure <$> askRq
-       addCookie Session ((mkCookie "authToken" (Text.unpack $ view unAuthSecret $ (view tokenValue authToken))) { secure = s })
-       return ()
+issueToken :: (MonadIO m) =>
+              AcidState AuthenticateState
+           -> User
+           -> m Text
+issueToken authenticateState user =
+  do ssecret <- do
+       mSSecret <- query' authenticateState (GetSharedSecret (_userId user))
+       case mSSecret of
+         (Just ssecret) -> return ssecret
+         Nothing -> do
+           ssecret <- genSharedSecret
+           update' authenticateState (SetSharedSecret (_userId user) ssecret)
+           return ssecret
+     let claims = def { unregisteredClaims = Map.fromList [("user", toJSON user)] }
+     return $ encodeSigned HS256 (secret $ _unSharedSecret ssecret) claims
 
--- | delete the authentication token for a 'UserId'
-deleteAuthCookie :: (Happstack m, Alternative m) =>
-                    AcidState AuthenticateState
-                 -> m ()
-deleteAuthCookie acidH =
-    do mToken <- optional $ (AuthSecret . Text.pack) <$> lookCookieValue "authToken"
-       case mToken of
-         Nothing         -> return ()
-         (Just token) ->
-             do expireCookie "authToken"
-                update' acidH (DeleteAuthToken token)
+decodeAndVerifyToken :: (MonadIO m) =>
+                        AcidState AuthenticateState
+                     -> Text
+                     -> m (Maybe (User, JWT VerifiedJWT))
+decodeAndVerifyToken authenticateState token =
+  do let mUnverified = decode token
+     case mUnverified of
+       Nothing -> return Nothing
+       (Just unverified) ->
+         case Map.lookup "user" (unregisteredClaims (claims unverified)) of
+           Nothing -> return Nothing
+           (Just uv) ->
+             case fromJSON uv of
+               (Error _) -> return Nothing
+               (Success u) ->
+                 do mssecret <- query' authenticateState (GetSharedSecret (u ^. userId))
+                    case mssecret of
+                      Nothing -> return Nothing
+                      (Just ssecret) ->
+                        case verify (secret (_unSharedSecret ssecret)) unverified of
+                          Nothing -> return Nothing
+                          (Just verified) -> return (Just (u, verified))
 
-getAuthToken :: (Alternative m, Happstack m) =>
-                AcidState AuthenticateState
-             -> m (Maybe AuthToken)
-getAuthToken acidH =
-    do mToken <- optional $ (AuthSecret . Text.pack) <$> lookCookieValue "authToken"
-       case mToken of
-         Nothing         -> return Nothing
-         (Just token) ->
-           do mAuthToken <- query' acidH (AskAuthToken token)
-              case mAuthToken of
-                Nothing -> return Nothing
-                (Just authToken) ->
-                    do now <- liftIO $ getCurrentTime
-                       if now > (view tokenExpires authToken)
-                         then do expireCookie "authToken"
-                                 update' acidH (DeleteAuthToken token)
-                                 return Nothing
-                         else if (diffUTCTime (addUTCTime (fromIntegral $ view tokenLifetime authToken) now) (view tokenExpires authToken)) > 60
-                                then do let newAuthToken = authToken { _tokenExpires = addUTCTime (fromIntegral $ view tokenLifetime authToken) now }
-                                        update' acidH (UpdateAuthToken newAuthToken)
-                                        return (Just newAuthToken)
-                                else return (Just authToken)
+------------------------------------------------------------------------------
+-- Token in a Cookie
+------------------------------------------------------------------------------
 
--- | get the 'UserId', assuming the user has a value authentication token
-getUserId :: (Alternative m, Happstack m) =>
-             AcidState AuthenticateState
-          -> m (Maybe UserId)
-getUserId acidH =
-    do mAuthToken <- getAuthToken acidH
-       case mAuthToken of
-         Nothing -> return Nothing
-         (Just authToken) ->
-             return $ Just (view tokenUserId authToken)
+authCookieName :: String
+authCookieName = "atc"
+
+addTokenCookie :: (Happstack m) =>
+                  AcidState AuthenticateState
+               -> Maybe User
+               -> m ()
+addTokenCookie authenticateState mUser =
+  case mUser of
+    (Just user) ->
+      do token <- issueToken authenticateState user
+         s <- rqSecure <$> askRq -- FIXME: this isn't that accurate in the face of proxies
+         addCookie Session ((mkCookie authCookieName (Text.unpack token)) { secure = s })
+    Nothing ->
+      do mCookie <- optional $ lookCookie authCookieName
+         case mCookie of
+           Nothing -> return ()
+           (Just cookie) ->
+             addCookie Session cookie
+
+deleteTokenCookie  :: (Happstack m) =>
+                      m ()
+deleteTokenCookie =
+  expireCookie authCookieName
+
+getTokenCookie :: (Happstack m) =>
+                   AcidState AuthenticateState
+                -> m (Maybe (User, JWT VerifiedJWT))
+getTokenCookie authenticateState =
+  do mToken <- optional $ lookCookieValue authCookieName
+     case mToken of
+       Nothing      -> return Nothing
+       (Just token) -> decodeAndVerifyToken authenticateState (Text.pack token)
+
+------------------------------------------------------------------------------
+-- AuthenticationMethod
+------------------------------------------------------------------------------
+
+newtype AuthenticationMethod = AuthenticationMethod { _unAuthenticationMethod :: Text }
+    deriving (Eq, Ord, Read, Show, Data, Typeable, Generic)
+derivePathInfo ''AuthenticationMethod
+deriveSafeCopy 1 'base ''AuthenticationMethod
+makeLenses ''AuthenticationMethod
+makeBoomerangs ''AuthenticationMethod
+
+instance ToJSON AuthenticationMethod   where toJSON (AuthenticationMethod method) = toJSON method
+instance FromJSON AuthenticationMethod where parseJSON v = AuthenticationMethod <$> parseJSON v
+
+type AuthenticationHandler = [Text] -> ServerPartT IO Response
+
+type AuthenticationHandlers = Map AuthenticationMethod AuthenticationHandler
+
+
+------------------------------------------------------------------------------
+-- AuthenticationURL
+------------------------------------------------------------------------------
+
+data AuthenticateURL
+    = Users (Maybe UserId)
+    | AuthenticationMethods (Maybe (AuthenticationMethod, [Text]))
+    deriving (Eq, Ord, Read, Show, Data, Typeable, Generic)
+
+makeBoomerangs ''AuthenticateURL
+
+authenticateURL :: Router () (AuthenticateURL :- ())
+authenticateURL =
+  (  "users" </> (  rUsers . rMaybe userId )
+  <> "authentication-methods" </> ( rAuthenticationMethods . rMaybe authenticationMethod)
+  )
+  where
+    userId = rUserId . integer
+    authenticationMethod = rPair . (rAuthenticationMethod . anyText) </> (rListSep anyText eos)
+
+instance PathInfo AuthenticateURL where
+  fromPathSegments = boomerangFromPathSegments authenticateURL
+  toPathSegments   = boomerangToPathSegments   authenticateURL
+
+nestAuthenticationMethod :: (PathInfo methodURL) =>
+                            AuthenticationMethod
+                         -> RouteT methodURL m a
+                         -> RouteT AuthenticateURL m a
+nestAuthenticationMethod authenticationMethod =
+  nestURL $ \methodURL -> AuthenticationMethods $ Just (authenticationMethod, toPathSegments methodURL)
+
+------------------------------------------------------------------------------
+-- CoreError
+------------------------------------------------------------------------------
+
+data CoreError
+  = HandlerNotFound AuthenticationMethod
+    deriving (Eq, Ord, Read, Show, Data, Typeable, Generic)
+instance ToJSON   CoreError where toJSON    = genericToJSON    jsonOptions
+instance FromJSON CoreError where parseJSON = genericParseJSON jsonOptions
+
+instance ToJExpr CoreError where
+    toJExpr = toJExpr . toJSON
+
+------------------------------------------------------------------------------
+-- route
+------------------------------------------------------------------------------
+
+route :: AuthenticationHandlers
+      -> AuthenticateURL
+      -> ServerPartT IO Response
+route authenticationHandlers url =
+  case url of
+    (AuthenticationMethods (Just (authenticationMethod, pathInfo))) ->
+      case Map.lookup authenticationMethod authenticationHandlers of
+        (Just handler) -> handler pathInfo
+        Nothing        -> notFound $ toJSONResponse (HandlerNotFound authenticationMethod)
+
+------------------------------------------------------------------------------
+-- initAuthenticate
+------------------------------------------------------------------------------
+
+initAuthentication :: Maybe FilePath
+                 -> [FilePath -> AcidState AuthenticateState -> IO (Bool -> IO (), (AuthenticationMethod, AuthenticationHandler))]
+                 -> IO (IO (), AuthenticateURL -> ServerPartT IO Response, AcidState AuthenticateState)
+initAuthentication mBasePath initMethods =
+  do let authenticatePath = combine (fromMaybe "_local" mBasePath) "authenticate"
+     authenticateState <- openLocalStateFrom (combine authenticatePath "core") initialAuthenticateState
+     -- FIXME: need to deal with one of the initMethods throwing an exception
+     (cleanupPartial, handlers) <- unzip <$> mapM (\initMethod -> initMethod authenticatePath authenticateState) initMethods
+     let cleanup = sequence_ $ map (\c -> c True) cleanupPartial
+         h       = route (Map.fromList handlers)
+     return (cleanup, h, authenticateState)

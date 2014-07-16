@@ -16,3 +16,11 @@ some new features being hoped for:
 We should review this document and make sure we are implementing everything accordingly.
 
 http://stackoverflow.com/questions/549/the-definitive-guide-to-forms-based-website-authentication/477578#477578
+
+When authenticating we generally have some process by which the user
+confirms their identity -- and then some other method by which we
+recognize that user in later requests. For example, they might submit
+a username and password to prove their identity. In later requests
+they merely submit an authentication token. Some will argue that the
+use of the authentication token pushes us into the realm of 'sessions'
+and is also therefore not RESTful.
