@@ -26,9 +26,10 @@ import Data.Unique
 import Data.Monoid ((<>))
 import GHC.Generics
 import Happstack.Authenticate.Core (AuthenticateURL(..), AuthenticateState, Email(..), User(..), Username(..), UserId(..), initAuthentication, decodeAndVerifyToken)
-import Happstack.Authenticate.Password.Core(PasswordState,PasswordURL(..), initPassword)
-import Happstack.Authenticate.Password.Forms(usernamePasswordForm)
 import Happstack.Authenticate.Password.Controllers(usernamePasswordCtrl)
+import Happstack.Authenticate.Password.Core(PasswordState)
+import Happstack.Authenticate.Password.Route (initPassword)
+import Happstack.Authenticate.Password.URL(PasswordURL(..))
 import Happstack.Server
 import Happstack.Server.HSP.HTML
 import Happstack.Server.XMLGenT
@@ -76,13 +77,13 @@ derivePathInfo ''SiteURL
 ------------------------------------------------------------------------------
 
 route :: AcidState AuthenticateState
-      -> (AuthenticateURL -> ServerPartT IO Response)
+      -> (AuthenticateURL -> RouteT AuthenticateURL (ServerPartT IO) Response)
       -> SiteURL
       -> RouteT SiteURL (ServerPartT IO) Response
 route authenticateState routeAuthenticate url =
   case url of
     Index        -> index
-    Authenticate authenticateURL -> lift $ routeAuthenticate authenticateURL
+    Authenticate authenticateURL -> nestURL Authenticate $ routeAuthenticate authenticateURL
     DemoAppJs   ->
       do ok $ toResponse $ demoAppJs
     UsernamePasswordJs ->
@@ -131,22 +132,26 @@ toJSONResponse v = toResponseBS "application/json" (encode v)
 -- We just depend on the usernamePassword module
 demoAppJs :: JStat
 demoAppJs = [jmacro|
-  var demoApp = angular.module('demoApp', [
-   'happstackAuthentication',
-   'usernamePassword'
-  ]);
-/*
+  {
+    var demoApp = angular.module('demoApp', [
+      'happstackAuthentication',
+      'usernamePassword'
+    ]);
+
+    demoApp.controller('DemoAppCtrl', ['$scope', '$http',function($scope, $http) {
+      $scope.message = '';
+
       $scope.callRestricted = function (url) {
         $http({url: url, method: 'GET'}).
         success(function (datum, status, headers, config) {
-          $scope.message = $scope.message + ' ' + datum.name; // Should log 'foo'
+          $scope.message = datum.name;
         }).
         error(function (datum, status, headers, config) {
           alert(datum);
         });
       };
-*/
-
+    }]);
+  }
  |]
 
 ------------------------------------------------------------------------------
@@ -185,13 +190,16 @@ index = do
        <div class="row">
        <div class="col-md-12">
         <div ng-controller="UsernamePasswordCtrl">
-         <% mapXMLGenT (nestURL Authenticate) usernamePasswordForm %>
+--         <% mapXMLGenT (nestURL Authenticate) usernamePasswordForm %>
+         <up-login-inline />
          <div up-authenticated=False>
           <p>Not Authenticated</p>
          </div>
          <div up-authenticated=True>
           <p>Authenticated</p>
-          <a ng-click="callRestricted('/api/restricted')" href="">Shh, this is private!</a>
+         </div>
+         <div ng-controller="DemoAppCtrl">
+          <a ng-click=("callRestricted('" <> (routeFn (Api Restricted) []) <> "')") href="">Shh, this is private!</a>
           <br />
           <div>{{message}}</div>
          </div>
